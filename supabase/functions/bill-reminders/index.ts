@@ -1,5 +1,5 @@
 // Moneyboard bill reminders. Runs each morning from a scheduled job and sends
-// phone alerts for repeating bills that are coming up. Also sends a test alert
+// phone alerts for repeating bills that are coming up, on personal and joint boards. Also sends a test alert
 // when a signed-in user asks for one from Settings.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -82,38 +82,50 @@ Deno.serve(async (req) => {
   const users = [...new Set((subUsers || []).map((r) => r.user_id))];
   let pushed = 0;
   for (const uid of users) {
-    const { data: row } = await db.from("boards").select("data").eq("user_id", uid).maybeSingle();
-    const d = row?.data;
-    if (!d) continue;
-    const st = d.settings || {}, remind = st.remind == null ? 3 : +st.remind;
-    if (!remind) continue;
-    const today = todayIn(st.tz || "Australia/Brisbane"), end = addDays(today, remind);
-    const due: { key: string; name: string; amt: number; date: string }[] = [];
-    for (const r of d.recurring || []) {
-      if (r.type !== "expense" || !r.next) continue;
-      let x = r.next, g = 0;
-      while (x <= end && g < 60) {
-        if (x >= today) due.push({ key: r.id + "|" + x, name: r.note || r.cat, amt: +r.amount || 0, date: x });
-        x = nextDate(x, r.freq, r.day); g++;
+    // Personal board plus every joint board this person is on
+    const boards: { data: any; label: string; scope: string }[] = [];
+    const { data: own } = await db.from("boards").select("data").eq("user_id", uid).maybeSingle();
+    if (own?.data) boards.push({ data: own.data, label: "", scope: "" });
+    const { data: mem } = await db.from("board_members").select("board_id").eq("user_id", uid).is("left_at", null);
+    const ids = (mem || []).map((m) => m.board_id);
+    if (ids.length) {
+      const { data: shared } = await db.from("shared_boards").select("id,name,data").in("id", ids);
+      for (const b of shared || []) if (b.data) boards.push({ data: b.data, label: b.name, scope: b.id + "|" });
+    }
+    let sentAny = false;
+    for (const bd of boards) {
+      const d = bd.data;
+      const st = d.settings || {}, remind = st.remind == null ? 3 : +st.remind;
+      if (!remind) continue;
+      const today = todayIn(st.tz || "Australia/Brisbane"), end = addDays(today, remind);
+      const due: { key: string; name: string; amt: number; date: string }[] = [];
+      for (const r of d.recurring || []) {
+        if (r.type !== "expense" || !r.next) continue;
+        let x = r.next, g = 0;
+        while (x <= end && g < 60) {
+          if (x >= today) due.push({ key: bd.scope + r.id + "|" + x, name: r.note || r.cat, amt: +r.amount || 0, date: x });
+          x = nextDate(x, r.freq, r.day); g++;
+        }
+      }
+      if (!due.length) continue;
+      const { data: done } = await db.from("push_log").select("key").eq("user_id", uid).in("key", due.map((b) => b.key));
+      const doneSet = new Set((done || []).map((r) => r.key));
+      const fresh = due.filter((b) => !doneSet.has(b.key)).sort((a, b) => a.date.localeCompare(b.date));
+      if (!fresh.length) continue;
+      const cur = st.currency || "AUD", pre = bd.label ? bd.label + ": " : "", tag = "bills-" + (bd.scope || "own-") + today;
+      const payload = fresh.length === 1
+        ? { title: pre + fresh[0].name + " due " + when(diffDays(today, fresh[0].date)), body: money(fresh[0].amt, cur) + " on " + dayLabel(fresh[0].date), tag }
+        : {
+            title: pre + fresh.length + " bills due soon, " + money(fresh.reduce((a, b) => a + b.amt, 0), cur) + " total",
+            body: fresh.slice(0, 4).map((b) => b.name + " " + money(b.amt, cur) + " " + when(diffDays(today, b.date))).join(", ") + (fresh.length > 4 ? ", plus " + (fresh.length - 4) + " more" : ""),
+            tag,
+          };
+      if (await sendAll(uid, payload)) {
+        await db.from("push_log").upsert(fresh.map((b) => ({ user_id: uid, key: b.key })));
+        sentAny = true;
       }
     }
-    if (!due.length) continue;
-    const { data: done } = await db.from("push_log").select("key").eq("user_id", uid).in("key", due.map((b) => b.key));
-    const doneSet = new Set((done || []).map((r) => r.key));
-    const fresh = due.filter((b) => !doneSet.has(b.key)).sort((a, b) => a.date.localeCompare(b.date));
-    if (!fresh.length) continue;
-    const cur = st.currency || "AUD";
-    const payload = fresh.length === 1
-      ? { title: fresh[0].name + " due " + when(diffDays(today, fresh[0].date)), body: money(fresh[0].amt, cur) + " on " + dayLabel(fresh[0].date), tag: "bills-" + today }
-      : {
-          title: fresh.length + " bills due soon, " + money(fresh.reduce((a, b) => a + b.amt, 0), cur) + " total",
-          body: fresh.slice(0, 4).map((b) => b.name + " " + money(b.amt, cur) + " " + when(diffDays(today, b.date))).join(", ") + (fresh.length > 4 ? ", plus " + (fresh.length - 4) + " more" : ""),
-          tag: "bills-" + today,
-        };
-    if (await sendAll(uid, payload)) {
-      await db.from("push_log").upsert(fresh.map((b) => ({ user_id: uid, key: b.key })));
-      pushed++;
-    }
+    if (sentAny) pushed++;
   }
   await db.from("push_log").delete().lt("sent_at", new Date(Date.now() - 60 * 864e5).toISOString());
   return json({ users: users.length, pushed });

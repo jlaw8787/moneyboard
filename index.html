@@ -481,6 +481,24 @@ select.inp{padding-right:30px;appearance:none;background-image:url("data:image/s
   .card{box-shadow:none;animation:none!important;opacity:1!important;break-inside:avoid}
   .bar i{transition:none}.grid.c4{grid-template-columns:repeat(4,minmax(0,1fr))}.grid.c2{grid-template-columns:repeat(2,minmax(0,1fr))}.table .hm{display:table-cell!important}
 }
+/* Joint boards */
+.bdwrap{position:relative;margin-bottom:4px}
+.bdsw{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px;border-radius:99px;background:#f1f2f4;color:var(--muted);font-size:12.5px;font-weight:500;position:relative}
+.bdsw:hover{color:var(--ink);background:#e9ebef}.bdsw.joint{background:var(--accent-soft);color:var(--accent)}
+.bdsw span{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bdsw .dot{position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:var(--neg);border:2px solid var(--bg)}
+.bdmenu{display:none;position:absolute;top:32px;left:0;z-index:40;width:300px;max-width:calc(100vw - 32px);background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(16,24,40,.12);padding:8px}
+.bdmenu.open{display:block}
+.bdh{font-size:11.5px;font-weight:500;color:var(--subtle);padding:8px 10px 4px}
+.bdi{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;border-radius:9px;color:var(--text)}
+.bdi:hover{background:var(--hover)}.bdi.on{color:var(--accent)}
+.bdi .grow{flex:1;min-width:0}.bdi b{display:block;font-weight:500;color:var(--ink);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bdi small{display:block;font-size:12px;color:var(--muted)}
+.bdinv{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;background:var(--hover);margin:2px 0}.bdinv>div:first-child{flex:1;min-width:0}.bdinv b{display:block;font-size:13px;font-weight:500;color:var(--ink)}.bdinv small{font-size:12px;color:var(--muted)}.bdinv .r{display:flex;gap:6px}
+.bdsep{height:1px;background:var(--line2);margin:6px 4px}
+.shsec{margin-bottom:14px}
+.shrow{display:flex;gap:8px;align-items:flex-end;margin-bottom:14px}
+@media (max-width:560px){.shrow{flex-wrap:wrap}.shrow .btn{width:100%;justify-content:center}}
+@media print{.bdwrap{display:none!important}}
 </style>
 </head>
 <body>
@@ -496,7 +514,7 @@ select.inp{padding-right:30px;appearance:none;background-image:url("data:image/s
   </aside>
   <main class="main">
     <header class="top">
-      <div class="t"><h1 id="title">Dashboard</h1><p id="subtitle"></p></div>
+      <div class="t"><div class="bdwrap"><button class="bdsw" id="bdsw" data-act="boardMenu" hidden aria-label="Switch board"></button><div class="bdmenu" id="bdmenu"></div></div><h1 id="title">Dashboard</h1><p id="subtitle"></p></div>
       <div class="ctl">
         <button data-act="month" data-n="-1" aria-label="Previous month" id="mPrev"></button>
         <span id="monthLabel"></span>
@@ -728,6 +746,8 @@ const VIEWS = {
 const LEVEL_XP = 250;
 const TITLES = ['Rookie','Saver','Tracker','Planner','Strategist','Money Pro','Wealth Builder','Legend'];
 const KEY = 'moneyboard.v3';
+let BOARD = (()=>{try{return localStorage.getItem('moneyboard.board')||null}catch(e){return null}})();
+const lkey = () => BOARD?KEY+'.b.'+BOARD:KEY;
 
 /* ============ Helpers ============ */
 const $ = s => document.querySelector(s);
@@ -750,10 +770,10 @@ const catChip = (inf,s=32) => '<span class="cat" style="width:'+s+'px;height:'+s
 
 /* ============ State ============ */
 function fresh(){return {txns:[],items:[],recurring:[],rules:[],period:'week',goals:[],xp:0,unlocked:{},notifs:[],alerted:{},flags:{},settings:{currency:'AUD'},view:'dashboard',month:curYM()}}
-function load(){try{const s=localStorage.getItem(KEY);return s?JSON.parse(s):null}catch(e){return null}}
+function load(){try{const s=localStorage.getItem(lkey());return s?JSON.parse(s):null}catch(e){return null}}
 const sig = () => JSON.stringify(S,(k,v)=>k==='view'||k==='month'||k==='savedAt'||k==='syncAt'||k==='syncUid'?undefined:v);
 let lastSig='';
-function store(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function store(){try{localStorage.setItem(lkey(),JSON.stringify(S))}catch(e){}}
 function save(silent){const j=sig();if(j!==lastSig){lastSig=j;if(!silent){S.savedAt=Date.now();schedulePush()}}store()}
 let S = load(), firstRun=false;
 if(!S){S=fresh();firstRun=true}
@@ -869,7 +889,7 @@ function nextDate(d,f,day){
 }
 function runRecurring(){
   const today=iso(new Date());let n=0;
-  (S.recurring||[]).forEach(r=>{let g=0;while(r.next<=today&&g<500){S.txns.push({id:uid(),date:r.next,type:r.type,amount:r.amount,cat:r.cat,note:r.note,rec:r.id,auto:true});r.next=nextDate(r.next,r.freq,r.day);n++;g++}});
+  (S.recurring||[]).forEach(r=>{let g=0;while(r.next<=today&&g<500){const rid='r-'+r.id+'-'+r.next;if(!S.txns.some(x=>x.id===rid))S.txns.push({id:rid,date:r.next,type:r.type,amount:r.amount,cat:r.cat,note:r.note,rec:r.id,auto:true});r.next=nextDate(r.next,r.freq,r.day);n++;g++}});
   return n;
 }
 function recurringNotice(n,quiet){if(!n)return;const b='Repeating items were added on their due dates';notify(n+' repeating transaction'+(n>1?'s':'')+' logged',b,'info');if(!quiet)toast(n+' repeating transaction'+(n>1?'s':'')+' logged',b,'info')}
@@ -1394,6 +1414,7 @@ function renderCut(){
 V.settings=()=>`
   <div class="grid c2">
     <div class="card" id="acctCard">${acctCard()}</div>
+    <div class="card" id="shareCard">${shareCard()}</div>
     <div class="card"><div class="ch"><h3>Preferences</h3></div>
       <label class="field" style="max-width:260px">Currency<select class="inp" id="sCur">${['AUD','NZD','USD','GBP','EUR','CAD'].map(c=>`<option ${S.settings.currency===c?'selected':''}>${c}</option>`).join('')}</select></label>
       <p class="muted" style="margin-top:16px;font-size:13px">${SB.user?'Your data is saved in this browser and synced to your account.':'Your data is stored in this browser only. Sign in to sync it, or export a backup from time to time.'}</p>
@@ -1576,7 +1597,7 @@ function renderNotifs(){
 function render(quiet){
   $('#view').classList.toggle('noanim',!!quiet);
   $('#title').textContent=VIEWS[S.view][1];$('#subtitle').textContent=SUBS[S.view]();
-  renderNav();renderTop();$('#view').innerHTML=V[S.view]();
+  renderNav();renderTop();renderBoardSw();$('#view').innerHTML=V[S.view]();
   if(S.view==='transactions')renderTxList();
   if(S.view==='planner'){renderProjection();renderCut()}
   animate(quiet);document.title=VIEWS[S.view][1]+' · Moneyboard';
@@ -1893,8 +1914,9 @@ function sbInit(){
   SB.client.auth.onAuthStateChange((ev,session)=>{
     const u=session?session.user:null;
     if(ev==='PASSWORD_RECOVERY')setTimeout(()=>authOpen('reset'),0);
-    if(u&&(!SB.user||SB.user.id!==u.id)){SB.user=u;setTimeout(()=>pull().then(()=>{if(S.settings.phoneAlerts)pushSubscribe().then(()=>{const c=$('#remindCard');if(c)c.innerHTML=remindCard()})}),0)}
+    if(u&&(!SB.user||SB.user.id!==u.id)){SB.user=u;setTimeout(()=>refreshBoards().then(()=>pull()).then(()=>startPoll()).then(()=>{if(S.settings.phoneAlerts)pushSubscribe().then(()=>{const c=$('#remindCard');if(c)c.innerHTML=remindCard()})}),0)}
     else if(!u&&SB.user){SB.user=null;setSync('off')}
+    if(!u&&BOARD)switchBoard(null,true);
   });
   renderSync();
 }
@@ -1903,6 +1925,7 @@ function syncLabel(){if(!SB.user)return 'Sign in to sync';return {synced:'Synced
 function renderSync(){
   const b=$('#syncBtn');if(b){b.innerHTML=ic('cloud',16)+'<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+syncLabel()+'</span>'+(SB.user?'<span class="sd '+SB.status+'"></span>':'');b.title=SB.user?SB.user.email:'Sign in to back up and sync across devices'}
   const c=$('#acctCard');if(c)c.innerHTML=acctCard();
+  refreshShareCard();renderBoardSw();
 }
 function acctCard(){
   if(!SB.user)return `<div class="ch"><h3>Account and sync</h3></div><p class="muted" style="font-size:13px;margin-bottom:14px">Optional. Sign in to back up your data to the cloud and use Moneyboard on your phone and computer with the same data.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" data-act="authOpen">${ic('cloud',16)}Sign in</button><button class="btn sec" data-act="authOpen" data-mode="up">Create account</button></div>`;
@@ -1913,14 +1936,17 @@ async function pushNow(){
   if(!SB.user||!SB.client)return;clearTimeout(SB.timer);
   if(SB.pushing){SB.again=true;return}SB.pushing=true;setSync('syncing');
   try{
+    if(BOARD){await pushShared();setSync('synced')}
+    else{
     const at=new Date(Math.max(Date.now(),(S.syncAt||0)+1));S.syncUid=SB.user.id;
     const {error}=await SB.client.from('boards').upsert({user_id:SB.user.id,data:S,updated_at:at.toISOString()});
-    if(error)throw error;S.syncAt=at.getTime();store();setSync('synced');
+    if(error)throw error;S.syncAt=at.getTime();store();setSync('synced');}
   }catch(e){setSync('error')}
   SB.pushing=false;if(SB.again||(S.savedAt||0)>(S.syncAt||0)&&SB.status==='synced'){SB.again=false;schedulePush()}
 }
 async function pull(){
   if(!SB.user||!SB.client||SB.busy)return;SB.busy=true;setSync('syncing');
+  if(BOARD){try{await pullShared()}catch(e){setSync('error')}SB.busy=false;return}
   try{
     const uid=SB.user.id,{data,error}=await SB.client.from('boards').select('data,updated_at').eq('user_id',uid).maybeSingle();
     if(error)throw error;
@@ -1939,7 +1965,7 @@ async function pull(){
   SB.busy=false;
 }
 function adopt(d,at){
-  const v=S.view;S=Object.assign(fresh(),d||{});S.view=v||'dashboard';S.syncUid=SB.user?SB.user.id:null;S.syncAt=at;S.savedAt=at;S.flags.welcomed=true;if(!S.flags.since)S.flags.since=Date.now();
+  const v=S.view;S=Object.assign(fresh(),d||{});S.view=v||'dashboard';S.syncUid=syncId();S.syncAt=at;S.savedAt=at;S.flags.welcomed=true;if(!S.flags.since)S.flags.since=Date.now();
   lastSig=sig();store();$('#welcome').classList.remove('open');
   const n=runRecurring();recurringNotice(n,true);checkAlerts(true);evalChallenges(true);save();
   setSync(SB.status==='syncing'&&(S.savedAt||0)<=(S.syncAt||0)?'synced':SB.status);render(true);
@@ -1983,8 +2009,201 @@ async function authSubmit(){
 }
 async function signOut(){
   if((S.savedAt||0)>(S.syncAt||0))await pushNow();
-  await pushUnsubscribe();await SB.client.auth.signOut();SB.user=null;S=fresh();S.flags.welcomed=true;S.flags.since=Date.now();lastSig=sig();store();setSync('off');render();
+  await pushUnsubscribe();await SB.client.auth.signOut();SB.user=null;clearInterval(BD.poll);
+  try{Object.keys(localStorage).filter(k=>k.startsWith(KEY+'.b.')).forEach(k=>localStorage.removeItem(k));localStorage.removeItem('moneyboard.board');localStorage.removeItem('moneyboard.boards')}catch(e){}
+  BOARD=null;BD.list=[];BD.invites=[];BD.people=[];BD.sent=[];BD.menu=false;S=fresh();S.flags.welcomed=true;S.flags.since=Date.now();lastSig=sig();store();setSync('off');render();
   toast('Signed out','Your data is safe in your account and has been removed from this device','info');
+}
+
+/* ============ Joint boards ============ */
+ICONS.users='<path d="M16 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1"/><circle cx="9.5" cy="7.5" r="3.5"/><path d="M21 19v-1a4 4 0 0 0-3-3.87"/><path d="M16 4.13a3.5 3.5 0 0 1 0 6.75"/>';
+ICONS.user='<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>';
+ICONS.chevD='<path d="m6 9 6 6 6-6"/>';
+ICONS.mail='<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>';
+const BD={list:(()=>{try{return JSON.parse(localStorage.getItem('moneyboard.boards')||'[]')}catch(e){return []}})(),invites:[],people:[],sent:[],seen:new Set(),poll:null,tick:0,menu:false};
+const syncId = () => BOARD?'b:'+BOARD:(SB.user?SB.user.id:null);
+const SKIPK = new Set(['view','month','savedAt','syncAt','syncUid']);
+const J = x => JSON.stringify(x);
+const isObj = x => !!x&&typeof x==='object'&&!Array.isArray(x);
+function clean(d){const o={};for(const k in d)if(!SKIPK.has(k))o[k]=d[k];return JSON.parse(J(o))}
+function getBase(){try{return JSON.parse(localStorage.getItem(lkey()+'.base')||'{}')}catch(e){return {}}}
+function setBase(d){try{localStorage.setItem(lkey()+'.base',J(d))}catch(e){}}
+/* Three way merge: keeps your changes and theirs. Lists of records are matched by id. */
+function merge3(b,l,r){
+  if(J(l)===J(b))return r;if(J(r)===J(b)||J(l)===J(r))return l;
+  const hasIds=a=>Array.isArray(a)&&a.some(x=>isObj(x)&&x.id!=null);
+  if(Array.isArray(l)&&Array.isArray(r)&&(hasIds(l)||hasIds(r)||hasIds(b))){
+    const B=new Map((Array.isArray(b)?b:[]).filter(x=>isObj(x)&&x.id!=null).map(x=>[x.id,x])),L=new Map(l.filter(x=>isObj(x)&&x.id!=null).map(x=>[x.id,x])),out=[],seen=new Set();
+    for(const x of r){if(!isObj(x)||x.id==null){out.push(x);continue}seen.add(x.id);const bx=B.get(x.id),lx=L.get(x.id);
+      if(!lx){if(!bx)out.push(x);continue}
+      out.push(bx?merge3(bx,lx,x):lx)}
+    for(const x of l){if(!isObj(x)||x.id==null||seen.has(x.id))continue;const bx=B.get(x.id);if(bx&&J(bx)===J(x))continue;out.push(x)}
+    return out;
+  }
+  if(isObj(l)&&isObj(r)){const bb=isObj(b)?b:{},o={};for(const k of new Set([...Object.keys(r),...Object.keys(l)])){const v=merge3(bb[k],l[k],r[k]);if(v!==undefined)o[k]=v}return o}
+  return l;
+}
+function useMerged(d,at,dirty){
+  const v=S.view,m=S.month;S=Object.assign(fresh(),d);S.view=v;S.month=m;S.syncUid=syncId();S.syncAt=at;S.savedAt=dirty?Date.now():at;S.flags.welcomed=true;
+  lastSig=sig();store();render(true);
+}
+async function pushShared(){
+  for(let tries=0;tries<4;tries++){
+    const snap=clean(S);
+    const {data:row,error}=await SB.client.from('shared_boards').select('data,updated_at').eq('id',BOARD).maybeSingle();
+    if(error)throw error;if(!row){boardGone();return}
+    const rat=Date.parse(row.updated_at),theirs=rat>(S.syncAt||0)+5;
+    const out=theirs?merge3(getBase(),snap,row.data||{}):snap;
+    const at=new Date(Math.max(Date.now(),rat+1)).toISOString();
+    const {data:upd,error:e2}=await SB.client.from('shared_boards').update({data:out,updated_at:at}).eq('id',BOARD).eq('updated_at',row.updated_at).select('updated_at');
+    if(e2)throw e2;
+    if(!upd||!upd.length)continue;
+    const t=Date.parse(upd[0].updated_at);setBase(out);
+    const now=clean(S),during=J(now)!==J(snap);
+    if(theirs||during)useMerged(during?merge3(snap,now,out):out,t,during);
+    else{S.syncAt=t;store()}
+    return;
+  }
+  throw new Error('Board is busy');
+}
+async function pullShared(){
+  const {data:row,error}=await SB.client.from('shared_boards').select('data,updated_at').eq('id',BOARD).maybeSingle();
+  if(error)throw error;if(!row){boardGone();return}
+  const at=Date.parse(row.updated_at),linked=S.syncUid===syncId(),dirty=(S.savedAt||0)>(S.syncAt||0);
+  if(linked&&at<=(S.syncAt||0)+5){if(dirty){SB.busy=false;await pushNow()}else setSync('synced');return}
+  if(linked&&dirty){SB.busy=false;await pushNow();return}
+  setBase(row.data||{});adopt(row.data||{},at);
+}
+function boardGone(){toast('That joint board is no longer available','You are back on your personal board','info');switchBoard(null,true)}
+async function switchBoard(id,skipPush){
+  id=id||null;BD.menu=false;
+  if(id===BOARD){render(true);return}
+  if(!skipPush&&SB.user&&(S.savedAt||0)>(S.syncAt||0))await pushNow();
+  clearTimeout(SB.timer);store();
+  const v=S.view,m=S.month;BOARD=id;
+  try{id?localStorage.setItem('moneyboard.board',id):localStorage.removeItem('moneyboard.board')}catch(e){}
+  S=Object.assign(fresh(),load()||{});S.view=v||'dashboard';S.month=m||curYM();S.flags.welcomed=true;if(!S.flags.since)S.flags.since=Date.now();
+  lastSig=sig();BD.people=[];BD.sent=[];setSync(SB.user?'syncing':'off');render(true);
+  if(SB.user){if(id)loadPeople();await pull()}
+  startPoll();
+}
+async function loadPeople(){
+  if(!BOARD||!SB.user)return;const b=BOARD;
+  const [p,s]=await Promise.all([SB.client.rpc('board_people',{p_board:b}),SB.client.from('board_invites').select('id,email,created_at').eq('board_id',b).eq('status','pending').order('created_at')]);
+  if(b!==BOARD)return;BD.people=p.data||[];BD.sent=s.data||[];refreshShareCard();
+}
+async function refreshBoards(){
+  if(!SB.user||!SB.client)return;
+  try{
+    const [b,i]=await Promise.all([SB.client.rpc('my_boards'),SB.client.rpc('my_invites')]);
+    if(b.error)throw b.error;
+    BD.list=b.data||[];BD.invites=i.data||[];
+    try{localStorage.setItem('moneyboard.boards',J(BD.list))}catch(e){}
+    if(BOARD&&!BD.list.some(x=>x.id===BOARD)){toast('You are no longer on that joint board','You are back on your personal board','info');await switchBoard(null,true)}
+    const nw=BD.invites.filter(x=>!BD.seen.has(x.id));
+    if(nw.length){nw.forEach(x=>{BD.seen.add(x.id);const k='invite|'+x.id;if(!S.alerted[k]){S.alerted[k]=1;notify('Invite to join '+x.board_name,(x.inviter_email||'Someone')+' wants to share a board with you','info')}});save();
+      if(!document.querySelector('.modal.open'))inviteModal(nw[0])}
+    if(BOARD)await loadPeople();
+  }catch(e){}
+  renderTop();renderBoardSw();refreshShareCard();
+}
+function startPoll(){
+  clearInterval(BD.poll);if(!SB.user)return;
+  BD.poll=setInterval(()=>{if(document.hidden||!SB.user)return;BD.tick++;if(BOARD)pull();if(BD.tick%4===0)refreshBoards()},30000);
+}
+function curBoard(){return BOARD?BD.list.find(x=>x.id===BOARD):null}
+function curBoardName(){const b=curBoard();return BOARD?(b?b.name:'Joint board'):'Personal'}
+function renderBoardSw(){
+  const b=$('#bdsw');if(!b)return;const show=!!(SB.user||BOARD);b.hidden=!show;if(!show){$('#bdmenu').classList.remove('open');return}
+  b.innerHTML=ic(BOARD?'users':'user',14,2)+'<span>'+esc(curBoardName())+'</span>'+ic('chevD',14,2)+(BD.invites.length?'<span class="dot"></span>':'');
+  b.classList.toggle('joint',!!BOARD);
+  const m=$('#bdmenu');m.classList.toggle('open',BD.menu);if(!BD.menu)return;
+  const row=(id,icon,name,sub)=>`<button class="bdi ${(id||null)===BOARD?'on':''}" data-act="boardGo" data-id="${id||''}">${ic(icon,16)}<span class="grow"><b>${esc(name)}</b><small>${sub}</small></span>${(id||null)===BOARD?ic('check',15,2.4):''}</button>`;
+  m.innerHTML=`<div class="bdh">Your boards</div>${row('', 'user','Personal','Only you')}${BD.list.map(x=>row(x.id,'users',x.name,x.members+(x.members===1?' person':' people'))).join('')}
+    ${BD.invites.length?`<div class="bdh">Invites</div>${BD.invites.map(x=>`<div class="bdinv"><div><b>${esc(x.board_name)}</b><small>From ${esc(x.inviter_email||'someone')}</small></div><div class="r"><button class="btn pri sm" data-act="invAccept" data-id="${x.id}">Join</button><button class="btn sec sm" data-act="invDecline" data-id="${x.id}">Decline</button></div></div>`).join('')}`:''}
+    <div class="bdsep"></div><button class="bdi" data-act="boardNew">${ic('plus',16)}<span class="grow"><b>New joint board</b></span></button><button class="bdi" data-act="boardManage">${ic('sliders',16)}<span class="grow"><b>Manage sharing</b></span></button>`;
+}
+function refreshShareCard(){const c=$('#shareCard');if(c)c.innerHTML=shareCard()}
+function shareCard(){
+  const h='<div class="ch"><h3>Sharing</h3>'+(BOARD?'<span class="pill ok">Joint board</span>':'<span class="pill nt">Personal board</span>')+'</div>';
+  if(!SB.user)return h+`<p class="muted" style="font-size:13px;margin-bottom:14px">Sign in to share a joint board with your partner or housemate. You each keep your own login and your personal board stays private.</p><button class="btn pri" data-act="authOpen">${ic('cloud',16)}Sign in</button>`;
+  const inv=BD.invites.length?`<div class="shsec"><div class="eyebrow" style="margin-bottom:6px">Invites waiting for you</div>${BD.invites.map(x=>`<div class="lrow">${catChip({i:'mail',c:'#3f63a8'},30)}<div class="grow"><div class="nm" style="font-size:13px">${esc(x.board_name)}</div><div class="sb">From ${esc(x.inviter_email||'someone')}</div></div><button class="btn pri sm" data-act="invAccept" data-id="${x.id}">Join</button><button class="btn sec sm" data-act="invDecline" data-id="${x.id}">Decline</button></div>`).join('')}</div>`:'';
+  if(!BOARD){
+    return h+inv+`<p class="muted" style="font-size:13px;margin-bottom:12px">This is your personal board and only you can see it. A joint board is a separate board you share with someone else. You both see and edit the same budget, bills and transactions, each with your own login.</p>
+    ${BD.list.length?`<div class="shsec">${BD.list.map(x=>`<div class="lrow">${catChip({i:'users',c:'#0e7a5c'},30)}<div class="grow"><div class="nm" style="font-size:13px">${esc(x.name)}</div><div class="sb">${x.members} ${x.members===1?'person':'people'} · you are ${x.role==='owner'?'the owner':'a member'}</div></div><button class="btn sec sm" data-act="boardGo" data-id="${x.id}">Open</button></div>`).join('')}</div>`:''}
+    <button class="btn pri" data-act="boardNew">${ic('plus',16,2)}New joint board</button>`;
+  }
+  const b=curBoard(),me=BD.people.find(p=>p.me),owner=me&&me.role==='owner';
+  return h+inv+`<form id="bdNameForm" class="shrow"><label class="field" style="flex:1">Board name<input class="inp" id="bdName" maxlength="40" value="${esc(b?b.name:'')}"></label><button class="btn sec" type="submit">Save</button></form>
+    <div class="shsec"><div class="eyebrow" style="margin-bottom:6px">People on this board</div>${BD.people.length?BD.people.map(p=>`<div class="lrow">${catChip({i:'user',c:p.me?'#0e7a5c':'#3f63a8'},30)}<div class="grow"><div class="nm" style="font-size:13px">${esc(p.email)}</div><div class="sb">${p.role==='owner'?'Owner':'Member'}${p.me?' · you':''}</div></div>${owner&&!p.me?`<button class="btn dng sm" data-act="bdRemove" data-id="${p.user_id}" data-email="${esc(p.email)}">Remove</button>`:''}</div>`).join(''):'<p class="muted" style="font-size:13px">Loading</p>'}
+    ${BD.sent.map(s=>`<div class="lrow">${catChip({i:'mail',c:'#b5761a'},30)}<div class="grow"><div class="nm" style="font-size:13px">${esc(s.email)}</div><div class="sb">Invite sent, waiting for them to join</div></div><button class="btn sec sm" data-act="bdCancelInv" data-id="${s.id}">Cancel</button></div>`).join('')}</div>
+    <form id="bdInvForm" class="shrow"><label class="field" style="flex:1">Invite someone by email<input class="inp" id="bdInvEmail" type="email" placeholder="partner@example.com" autocomplete="off"></label><button class="btn pri" type="submit">${ic('mail',16)}Send invite</button></form>
+    <p class="muted" style="font-size:12.5px;margin:-4px 0 14px">They see the invite next time they sign in to Moneyboard with that email. If they do not have an account yet, they can create one with that email and the invite will be waiting. No email is sent, so let them know.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" data-act="boardGo" data-id="">${ic('user',16)}Back to personal board</button><button class="btn dng" data-act="bdLeave">Leave this board</button></div>`;
+}
+function inviteModal(x){
+  $('#authBox').innerHTML=`<div class="mh"><h2>Join a joint board?</h2><button class="del" style="opacity:1" data-act="authClose" aria-label="Close">${ic('x',16)}</button></div>
+  <p style="font-size:13.5px;margin-bottom:10px"><b>${esc(x.inviter_email||'Someone')}</b> invited you to their joint board <b>${esc(x.board_name)}</b>.</p>
+  <p class="muted" style="font-size:13px;margin-bottom:16px">You will both see and edit the same budget, bills and transactions on that board. Your personal board stays private and you can switch between them at the top of the app.</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" data-act="invAccept" data-id="${x.id}">Join board</button><button class="btn sec" data-act="invDecline" data-id="${x.id}">Decline</button><button class="lnk" data-act="authClose" style="margin-left:auto">Decide later</button></div>`;
+  $('#authModal').classList.add('open');
+}
+function newBoardModal(){
+  if(!SB.user){authOpen('in');return}
+  $('#authBox').innerHTML=`<div class="mh"><h2>New joint board</h2><button class="del" style="opacity:1" data-act="authClose" aria-label="Close">${ic('x',16)}</button></div>
+  <form id="bdNewForm" style="display:flex;flex-direction:column;gap:12px">
+    <label class="field">Name<input class="inp" id="bdNewName" maxlength="40" value="Household"></label>
+    <p class="muted" style="font-size:13px">Your budget lines and repeating bills from ${BOARD?'this board':'your personal board'} are copied across to give you a head start. Transactions, goals and XP start fresh. You can invite someone once it is made.</p>
+    <div class="autherr" id="bdNewErr"></div>
+    <button class="btn pri" type="submit" id="bdNewGo">Create board</button>
+  </form>`;
+  $('#authModal').classList.add('open');setTimeout(()=>{const f=$('#bdNewName');if(f){f.focus();f.select()}},40);
+}
+function confirmModal(title,body,btn,act,data){
+  $('#authBox').innerHTML=`<div class="mh"><h2>${title}</h2><button class="del" style="opacity:1" data-act="authClose" aria-label="Close">${ic('x',16)}</button></div><p class="muted" style="font-size:13px;margin-bottom:16px">${body}</p><div style="display:flex;gap:8px"><button class="btn dng" data-act="${act}" ${Object.entries(data||{}).map(([k,v])=>`data-${k}="${esc(v)}"`).join(' ')}>${btn}</button><button class="btn sec" data-act="authClose">Cancel</button></div>`;
+  $('#authModal').classList.add('open');
+}
+const rpcErr = e => String((e&&e.message)||'Something went wrong. Try again.');
+async function createBoard(name){
+  const d=fresh();d.items=JSON.parse(J(S.items||[]));d.recurring=JSON.parse(J(S.recurring||[]));d.period=S.period||'week';
+  d.settings={currency:S.settings.currency||'AUD',tz:S.settings.tz,remind:S.settings.remind};d.flags={welcomed:true,setup:!!S.flags.setup,since:Date.now()};
+  const data=clean(d);const {data:id,error}=await SB.client.rpc('create_shared_board',{p_name:name,p_data:data});
+  if(error)throw error;await refreshBoards();await switchBoard(id);
+}
+async function answerInvite(id,accept){
+  $('#authModal').classList.remove('open');BD.menu=false;
+  const {data,error}=await SB.client.rpc('answer_invite',{p_invite:id,p_accept:accept});
+  if(error){toast('Could not answer the invite',rpcErr(error),'bad');refreshBoards();return}
+  BD.invites=BD.invites.filter(x=>x.id!==id);
+  if(accept&&data){await refreshBoards();await switchBoard(data);toast('You joined '+curBoardName(),'Switch boards any time from the top of the app','good')}
+  else{toast('Invite declined','','info');refreshBoards()}
+}
+async function shareAct(a,el){
+  if(a==='boardMenu'){BD.menu=!BD.menu;if(BD.menu&&SB.user)refreshBoards();renderBoardSw();return true}
+  if(a==='boardGo'){switchBoard(el.dataset.id||null);return true}
+  if(a==='boardNew'){BD.menu=false;renderBoardSw();newBoardModal();return true}
+  if(a==='boardManage'){BD.menu=false;S.view='settings';render();setTimeout(()=>{const c=$('#shareCard');if(c)c.scrollIntoView({behavior:'smooth',block:'start'})},60);return true}
+  if(a==='invAccept'){answerInvite(el.dataset.id,true);return true}
+  if(a==='invDecline'){answerInvite(el.dataset.id,false);return true}
+  if(a==='bdCancelInv'){const {error}=await SB.client.rpc('cancel_invite',{p_invite:el.dataset.id});if(error)toast('Could not cancel',rpcErr(error),'bad');else toast('Invite cancelled','','info');loadPeople();return true}
+  if(a==='bdRemove'){confirmModal('Remove '+esc(el.dataset.email)+'?','They will lose access to this joint board straight away. Their own personal board is not touched. You can invite them again later.','Remove','bdRemoveGo',{id:el.dataset.id});return true}
+  if(a==='bdRemoveGo'){$('#authModal').classList.remove('open');const {error}=await SB.client.rpc('leave_board',{p_board:BOARD,p_user:el.dataset.id});if(error)toast('Could not remove them',rpcErr(error),'bad');else toast('Removed from the board','','info');refreshBoards();return true}
+  if(a==='bdLeave'){const alone=BD.people.length<=1;confirmModal('Leave '+esc(curBoardName())+'?',alone?'You are the only person on this board, so leaving closes it and its data is cleared. Export a backup first if you want to keep a copy.':'You will lose access to this board. Everyone else keeps it. Someone on the board can invite you back later.','Leave board','bdLeaveGo');return true}
+  if(a==='bdLeaveGo'){$('#authModal').classList.remove('open');const b=BOARD,n=curBoardName();if((S.savedAt||0)>(S.syncAt||0))await pushNow();const {error}=await SB.client.rpc('leave_board',{p_board:b});if(error){toast('Could not leave',rpcErr(error),'bad');return true}
+    try{localStorage.removeItem(KEY+'.b.'+b);localStorage.removeItem(KEY+'.b.'+b+'.base')}catch(e){}
+    await switchBoard(null,true);toast('You left '+n,'You are back on your personal board','info');refreshBoards();return true}
+  return false;
+}
+async function shareSubmit(e){
+  const id=e.target.id;
+  if(id==='bdNewForm'){e.preventDefault();const go=$('#bdNewGo'),err=$('#bdNewErr');go.disabled=true;go.textContent='Creating';
+    try{await createBoard($('#bdNewName').value);$('#authModal').classList.remove('open');toast('Joint board created','Invite someone from Settings, under Sharing','good')}
+    catch(x){err.textContent=rpcErr(x);go.disabled=false;go.textContent='Create board'}return true}
+  if(id==='bdInvForm'){e.preventDefault();const em=$('#bdInvEmail').value.trim();if(!/^\S+@\S+\.\S+$/.test(em)){toast('Enter a valid email','','bad');return true}
+    const {error}=await SB.client.rpc('invite_to_board',{p_board:BOARD,p_email:em});
+    if(error)toast('Invite not sent',rpcErr(error),'bad');else toast('Invite ready for '+em,'They will see it next time they sign in. Let them know to check','good');loadPeople();return true}
+  if(id==='bdNameForm'){e.preventDefault();const {error}=await SB.client.rpc('rename_board',{p_board:BOARD,p_name:$('#bdName').value});if(error)toast('Could not rename',rpcErr(error),'bad');else toast('Board renamed','','good');refreshBoards();return true}
+  return false;
 }
 
 /* ============ Events ============ */
@@ -1999,7 +2218,9 @@ document.addEventListener('click',e=>{
   if(e.target.id==='ach'){closeAch();return}
   if(e.target.id==='itemModal'){$('#itemModal').classList.remove('open');return}
   if(e.target.id==='authModal'&&!CONF){$('#authModal').classList.remove('open');return}
+  if(BD.menu&&!e.target.closest('#bdmenu')&&!e.target.closest('#bdsw')){BD.menu=false;renderBoardSw()}
   const el=e.target.closest('[data-act]');if(!el)return;const a=el.dataset.act;
+  if(/^(board|inv|bd)/.test(a)){shareAct(a,el);return}
   if(a==='wizOpen'){wizOpen();return}
   if(a==='welcomeFresh'){S.flags.welcomed=true;$('#welcome').classList.remove('open');S.view='budgets';save();render();return}
   if(a==='welcomeDemo'){const fl=S.flags;S=fresh();S.flags=Object.assign(fl,{welcomed:true,sample:true});seed();checkAlerts(true);evalChallenges(true);save();$('#welcome').classList.remove('open');render();toast('Sample data loaded','Clear it any time in Settings when you are ready to start','info');return}
@@ -2079,6 +2300,7 @@ document.addEventListener('change',e=>{const t=e.target;
   else if(t.id==='importFile'&&t.files[0]){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.txns))throw 0;S=Object.assign(fresh(),d,{syncUid:S.syncUid,syncAt:S.syncAt,view:S.view});S.flags.welcomed=true;S.flags.sample=false;save();render();toast('Backup restored',S.txns.length+' transactions loaded','good')}catch(err){toast('Import failed','Choose a Moneyboard backup file (.json)','bad')}};r.readAsText(t.files[0])}
 });
 document.addEventListener('submit',e=>{
+  if(/^bd/.test(e.target.id)){shareSubmit(e);return}
   if(e.target.id==='authForm'){e.preventDefault();authSubmit();return}
   if(e.target.id==='itemForm'){e.preventDefault();const name=$('#iName').value.trim(),cat=$('#iCat').value,amt=parseAmt($('#iAmt').value);if(!name||!(amt>0)){$('#iAmt').focus();return}
     const ex=IM.id&&S.items.find(x=>x.id===IM.id);if(ex){if(ex.name!==name||ex.cat!==cat)ex.key=null;Object.assign(ex,{name,cat,amt,freq:IM.f})}else S.items.push({id:uid(),key:null,cat,name,amt,freq:IM.f});
@@ -2106,7 +2328,7 @@ document.addEventListener('keydown',e=>{
 /* ============ Boot ============ */
 const bootRec=runRecurring();recurringNotice(bootRec,true);
 checkAlerts(true);evalChallenges(true);save(true);render();renderSync();sbLoad();
-document.addEventListener('visibilitychange',()=>{if(document.hidden){if(SB.user&&(S.savedAt||0)>(S.syncAt||0))pushNow();return}const bills=()=>{const c=Object.keys(S.alerted).length;checkBills();if(Object.keys(S.alerted).length!==c){save();render(true)}};if(SB.user){pull().then(bills);return}const n=runRecurring();if(n){recurringNotice(n);commit()}else bills()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){if(SB.user&&(S.savedAt||0)>(S.syncAt||0))pushNow();return}const bills=()=>{const c=Object.keys(S.alerted).length;checkBills();if(Object.keys(S.alerted).length!==c){save();render(true)}};if(SB.user){refreshBoards();pull().then(bills);return}const n=runRecurring();if(n){recurringNotice(n);commit()}else bills()});
 addEventListener('online',()=>{if(SB.user)pull()});
 if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 setTimeout(()=>{
