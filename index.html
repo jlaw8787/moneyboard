@@ -473,6 +473,13 @@ select.inp{padding-right:30px;appearance:none;background-image:url("data:image/s
   </div>
 </div>
 
+<div class="modal" id="welcome" role="dialog" aria-modal="true" aria-labelledby="wTitle"><div class="box" style="max-width:420px;text-align:center;padding:32px 28px 24px">
+  <span class="cat" id="wMark" style="width:56px;height:56px;border-radius:16px;margin:0 auto 18px;background:var(--ink);color:#fff"></span>
+  <h2 id="wTitle" style="font-size:22px;letter-spacing:-.02em">Welcome to Moneyboard</h2>
+  <p class="muted" style="font-size:13.5px;margin:8px 0 22px">Start with a blank slate and build your own budget, or look around with sample data first. You can switch any time in Settings.</p>
+  <div style="display:flex;flex-direction:column;gap:8px"><button class="btn pri" data-act="welcomeFresh">Start fresh</button><button class="btn sec" data-act="welcomeDemo">Explore with sample data</button></div>
+  <p class="subtle" style="font-size:12px;margin-top:16px">Your data stays in this browser. Nothing is sent anywhere.</p>
+</div></div>
 <div class="modal" id="ach" role="dialog" aria-modal="true" aria-label="Achievement"><div class="box achbox" id="achBox"></div></div>
 <div class="modal" id="wiz" role="dialog" aria-modal="true" aria-label="Budget setup"><div class="box wbox" id="wizBox"></div></div>
 <div class="modal" id="itemModal" role="dialog" aria-modal="true" aria-label="Budget item"><div class="box" id="itemBox"></div></div>
@@ -672,7 +679,7 @@ function fresh(){return {txns:[],items:[],recurring:[],period:'week',goals:[],xp
 function load(){try{const s=localStorage.getItem(KEY);return s?JSON.parse(s):null}catch(e){return null}}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 let S = load(), firstRun=false;
-if(!S){S=fresh();seed();firstRun=true}
+if(!S){S=fresh();firstRun=true}
 S = Object.assign(fresh(),S);
 
 function seed(){
@@ -976,7 +983,7 @@ V.dashboard=()=>{
   </div>
 
   <div class="grid w21">
-    <div class="card chart"><div class="ch"><h3>Spending pace</h3><span class="s">${lastDay?(diff>0?'<span class="neg">'+money(diff)+' ahead of budget pace</span>':'<span class="pos">'+money(-diff)+' under budget pace</span>'):'No data'}</span></div>
+    <div class="card chart"><div class="ch"><h3>Spending pace</h3><span class="s">${lastDay&&(tb||spentNow)?(diff>0?'<span class="neg">'+money(diff)+' ahead of budget pace</span>':'<span class="pos">'+money(Math.abs(diff))+' under budget pace</span>'):'No data yet'}</span></div>
       <svg viewBox="0 -8 ${W} ${Hh+32}">
         <defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0e7a5c" stop-opacity=".14"/><stop offset="1" stop-color="#0e7a5c" stop-opacity="0"/></linearGradient></defs>
         ${gl}
@@ -1247,7 +1254,7 @@ function animate(quiet){
 function commit(){checkAlerts();evalChallenges();save();render(true)}
 
 /* ============ Static chrome ============ */
-$('#brandMark').innerHTML=ic('logo',16,2.2);$('#mPrev').innerHTML=ic('chevL',16);$('#mNext').innerHTML=ic('chevR',16);
+$('#brandMark').innerHTML=ic('logo',16,2.2);$('#wMark').innerHTML=ic('logo',26,2.2);$('#mPrev').innerHTML=ic('chevL',16);$('#mNext').innerHTML=ic('chevR',16);
 $('#addBtn').innerHTML=ic('plus',16,2)+'Add transaction';$('#fab').innerHTML=ic('plus',24,2);$('#mClose').innerHTML=ic('x',16);
 
 /* ============ Modal ============ */
@@ -1401,6 +1408,8 @@ document.addEventListener('click',e=>{
   if(e.target.id==='itemModal'){$('#itemModal').classList.remove('open');return}
   const el=e.target.closest('[data-act]');if(!el)return;const a=el.dataset.act;
   if(a==='wizOpen'){wizOpen();return}
+  if(a==='welcomeFresh'){S.flags.welcomed=true;$('#welcome').classList.remove('open');S.view='budgets';save();render();return}
+  if(a==='welcomeDemo'){const fl=S.flags;S=fresh();S.flags=Object.assign(fl,{welcomed:true});seed();checkAlerts(true);evalChallenges(true);save();$('#welcome').classList.remove('open');render();toast('Sample data loaded','Clear it any time in Settings when you are ready to start','info');return}
   if(a==='more'){$('#msheet').classList.toggle('open');return}
   if(a==='txEdit'){openModal('edit',el.dataset.id);return}
   if(a==='recNew'){openModal('new');$('#fRepeat').value='monthly';return}
@@ -1436,7 +1445,7 @@ document.addEventListener('click',e=>{
     S.flags.backup=true;commit();const b=$('#exportBox');if(b){b.style.display='block';b.value=data}
   }
   else if(a==='demo'){const keep={xp:S.xp,unlocked:S.unlocked,settings:S.settings,notifs:S.notifs};S=Object.assign(fresh(),keep);seed();S.view='dashboard';checkAlerts(true);evalChallenges(true);save();render();toast('Sample data loaded','','info')}
-  else if(a==='clear'){if(el.dataset.armed){S=fresh();save();render();toast('All data cleared','Add your first transaction to begin','info')}else{el.dataset.armed=1;el.querySelector('span').textContent='Click again to confirm';setTimeout(()=>{if(el.isConnected){delete el.dataset.armed;el.querySelector('span').textContent='Clear all data'}},4000)}}
+  else if(a==='clear'){if(el.dataset.armed){S=fresh();S.flags.welcomed=true;save();render();toast('All data cleared','Add your first transaction to begin','info')}else{el.dataset.armed=1;el.querySelector('span').textContent='Click again to confirm';setTimeout(()=>{if(el.isConnected){delete el.dataset.armed;el.querySelector('span').textContent='Clear all data'}},4000)}}
 });
 document.addEventListener('input',e=>{const t=e.target;
   if(t.id==='fq'){F.q=t.value;renderTxList()}
@@ -1481,8 +1490,8 @@ const bootRec=runRecurring();recurringNotice(bootRec,true);
 checkAlerts(true);evalChallenges(true);save();render();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){const n=runRecurring();if(n){recurringNotice(n);commit()}}});
 setTimeout(()=>{
-  if(firstRun)toast('Welcome to Moneyboard','Sample data is loaded. Clear it any time in Settings.','info');
-  else if(bootRec)toast(bootRec+' repeating transaction'+(bootRec>1?'s':'')+' logged','Repeating items were added on their due dates','info');
+  if(!S.flags.welcomed&&!S.txns.length&&!S.items.length&&!S.goals.length){$('#welcome').classList.add('open');return}
+  if(bootRec)toast(bootRec+' repeating transaction'+(bootRec>1?'s':'')+' logged','Repeating items were added on their due dates','info');
   else{const un=S.notifs.filter(n=>!n.read).length;if(un)toast(un+' unread notification'+(un>1?'s':''),'Open the bell to catch up','info')}
 },500);
 </script>
