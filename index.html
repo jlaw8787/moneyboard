@@ -1538,9 +1538,9 @@ function adopt(d,at){
 let CONF=null;
 function conflict(d,at){
   CONF={d,at};setSync('pending');
-  const n=x=>(x.txns||[]).length,cd=new Date(at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
+  const n=x=>{const k=(x.txns||[]).length;return k+' transaction'+(k===1?'':'s')},cd=new Date(at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
   $('#authBox').innerHTML=`<div class="mh"><h2>Which data should we keep?</h2></div><p class="muted" style="font-size:13px;margin-bottom:16px">Your account and this device both have data. Pick one to keep. The other will be replaced, so export a backup first if you are unsure.</p>
-  <div style="display:flex;flex-direction:column;gap:8px"><button class="choice" data-act="confCloud"><b>Use my account data</b><small>${n(d)} transactions, last saved ${cd}</small></button><button class="choice" data-act="confLocal"><b>Use this device's data</b><small>${n(S)} transactions on this device</small></button></div>
+  <div style="display:flex;flex-direction:column;gap:8px"><button class="choice" data-act="confCloud"><b>Use my account data</b><small>${n(d)}, last saved ${cd}</small></button><button class="choice" data-act="confLocal"><b>Use this device's data</b><small>${n(S)} on this device</small></button></div>
   <button class="lnk" data-act="export" style="margin-top:14px">Export a backup of this device first</button>`;
   $('#authModal').classList.add('open');
 }
