@@ -1,5 +1,5 @@
 /* Moneyboard offline support. Pages load fresh when online and fall back to the saved copy when offline. */
-const CACHE = 'moneyboard-v2';
+const CACHE = 'moneyboard-v3';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE))); self.skipWaiting(); });
 self.addEventListener('activate', e => {
@@ -18,4 +18,11 @@ self.addEventListener('fetch', e => {
   if (url.hostname === 'cdn.jsdelivr.net' || url.hostname.endsWith('googleapis.com') || url.hostname.endsWith('gstatic.com')) {
     e.respondWith(caches.match(req).then(m => { const net = fetch(req).then(keep).catch(() => m); return m || net; }));
   }
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(list => {
+    for (const c of list) { if ('focus' in c) return c.focus(); }
+    return self.clients.openWindow('./');
+  }));
 });

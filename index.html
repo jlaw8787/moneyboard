@@ -778,6 +778,8 @@ function seed(){
   rr('expense',72,'Health','Gym membership','monthly',onDay(2));
   rr('expense',17,'Subscriptions','Netflix','monthly',onDay(5));
   rr('expense',13,'Subscriptions','Spotify','monthly',onDay(12));
+  rr('expense',35,'Utilities','Mobile plan','monthly',onDay(18));
+  rr('expense',210,'Insurance','Private health insurance','monthly',onDay(3));
   S.goals=[
     {id:uid(),name:'Emergency fund',target:10000,saved:4200,icon:'shield',color:'#0e7a5c',hit:{25:1}},
     {id:uid(),name:'Japan trip',target:6000,saved:1850,icon:'plane',color:'#3f63a8',hit:{25:1}},
@@ -918,7 +920,49 @@ function checkAlerts(silent){
     if(p>=1&&!S.alerted[k+'|100']){S.alerted[k+'|100']=S.alerted[k+'|80']=1;notify(c+' is over budget',money(sp)+' spent of '+money(b),'bad');if(!silent)toast(c+' is over budget',money(sp)+' spent of '+money(b),'bad')}
     else if(p>=.8&&p<1&&!S.alerted[k+'|80']){S.alerted[k+'|80']=1;notify(c+' at '+Math.round(p*100)+'% of budget',money(b-sp)+' left this month','warn');if(!silent)toast(c+' at '+Math.round(p*100)+'% of budget',money(b-sp)+' left this month','warn')}
   }
+  checkBills(silent);
 }
+/* ============ Bill reminders ============ */
+const remindDays = () => S.settings.remind==null?3:+S.settings.remind;
+function addDays(d,n){const [y,m,dd]=d.split('-').map(Number);return iso(new Date(y,m-1,dd+n))}
+function daysUntil(d){const [y,m,dd]=d.split('-').map(Number),n=new Date();return Math.round((new Date(y,m-1,dd)-new Date(n.getFullYear(),n.getMonth(),n.getDate()))/864e5)}
+function whenText(n){return n<=0?'today':n===1?'tomorrow':'in '+n+' days'}
+function upcomingBills(days){
+  const today=iso(new Date()),end=addDays(today,days),out=[];
+  (S.recurring||[]).filter(r=>r.type==='expense').forEach(r=>{let d=r.next,g=0;while(d<=end&&g<60){if(d>=today)out.push({r,date:d});d=nextDate(d,r.freq,r.day);g++}});
+  return out.sort((a,b)=>a.date.localeCompare(b.date)||b.r.amount-a.r.amount);
+}
+function sysNotify(title,body,tag){
+  if(!S.settings.phoneAlerts||!('Notification' in window)||Notification.permission!=='granted')return;
+  const o={body,tag,icon:'icon-192.png',badge:'icon-192.png'};
+  try{if(navigator.serviceWorker&&navigator.serviceWorker.controller){navigator.serviceWorker.ready.then(r=>r.showNotification(title,o)).catch(()=>{})}else new Notification(title,o)}catch(e){}
+}
+function checkBills(silent){
+  const days=remindDays(),today=iso(new Date());
+  for(const k in S.alerted){if(k.startsWith('bill|')&&k.slice(-10)<today)delete S.alerted[k]}
+  let sent={};try{sent=JSON.parse(localStorage.getItem('mb-billalerts')||'{}')}catch(e){}
+  for(const k in sent)if(k.slice(-10)<today)delete sent[k];
+  if(days)upcomingBills(days).forEach(({r,date})=>{
+    const k='bill|'+r.id+'|'+date,nm=r.note||r.cat,n=daysUntil(date),title=nm+' due '+whenText(n),body=money(r.amount,2)+' on '+new Date(date+'T00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
+    if(!S.alerted[k]){S.alerted[k]=1;notify(title,body,'warn');if(!silent)toast(title,body,'warn')}
+    if(!sent[k]&&S.settings.phoneAlerts){sent[k]=1;sysNotify(title,body,k)}
+  });
+  try{localStorage.setItem('mb-billalerts',JSON.stringify(sent))}catch(e){}
+}
+function billsCard(){
+  const L=upcomingBills(14),tot=L.reduce((a,b)=>a+b.r.amount,0),days=remindDays();
+  return `<div class="card" style="margin-bottom:16px"><div class="ch"><div><h3>Bills coming up</h3><div class="s" style="margin-top:2px">${L.length?money(tot)+' due in the next 14 days':'Next 14 days'}</div></div><button class="lnk" data-act="nav" data-view="transactions">Repeating items ${ic('chevR',14)}</button></div>
+  ${L.length?L.slice(0,6).map(({r,date})=>{const n=daysUntil(date),ci=CATS[r.cat]||CATS.Other;return `<div class="lrow">${catChip(ci,28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(r.note||r.cat)}</div><div class="sb">${new Date(date+'T00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'})}</div></div><span class="pill ${days&&n<=days?'warn':'nt'}">${n<=0?'Today':n===1?'Tomorrow':'In '+n+' days'}</span><span class="amt" style="width:84px;text-align:right">${money(r.amount,2)}</span></div>`}).join('')+(L.length>6?`<div class="muted" style="font-size:12.5px;margin-top:10px">Plus ${L.length-6} more</div>`:''):`<div class="empty">${ic('calendar',28,1.5)}No repeating bills due in the next two weeks<div style="margin-top:12px"><button class="btn sec sm" data-act="recNew">${ic('plus',14,2)}Add a repeating bill</button></div></div>`}
+  </div>`;
+}
+function remindCard(){
+  const has='Notification' in window,perm=has?Notification.permission:'denied',on=S.settings.phoneAlerts&&perm==='granted';
+  return `<div class="ch"><h3>Bill reminders</h3></div>
+    <label class="field" style="max-width:260px">Remind me<select class="inp" id="sRemind">${[[0,'Off'],[1,'1 day before'],[2,'2 days before'],[3,'3 days before'],[7,'A week before']].map(([v,l])=>`<option value="${v}" ${remindDays()===v?'selected':''}>${l}</option>`).join('')}</select></label>
+    <p class="muted" style="font-size:13px;margin:14px 0">Reminders come from your repeating expenses and show in the bell. Phone alerts also pop up on your phone or computer when Moneyboard is open or brought back up. They can't come through while the app is fully closed.</p>
+    ${!has?'<div class="recnote">This browser does not support alerts. On an iPhone, add Moneyboard to your home screen first, then open it from there.</div>':perm==='denied'?'<div class="recnote">Alerts are blocked for this site. Turn them on in your browser or phone settings, then come back here.</div>':on?`<div style="display:flex;gap:8px;flex-wrap:wrap"><span class="pill ok" style="height:30px;padding:0 12px">${ic('check',13,2.4)}&nbsp;Phone alerts on</span><button class="btn sec sm" data-act="alertsOff">Turn off</button><button class="btn sec sm" data-act="alertsTest">Send a test</button></div>`:`<button class="btn sec" data-act="alertsOn">${ic('bell',16)}Turn on phone alerts</button>`}`;
+}
+
 function toast(title,body,kind){
   const k=KIND[kind]||KIND.info,el=document.createElement('div');el.className='toast';
   el.innerHTML='<span class="ni" style="background:'+k[2]+';color:'+k[1]+'">'+ic(k[0],15,2)+'</span><div><b>'+esc(title)+'</b>'+(body?'<small>'+esc(body)+'</small>':'')+'</div>';
@@ -1082,6 +1126,8 @@ V.dashboard=()=>{
       <div class="kpi"><div class="eyebrow">Savings rate</div><div class="v ${t.rate<0?'neg':''}">${count(t.rate*100,'pct')}</div><div><span class="chip ${t.rate>=.2?'up':'nt'}">${t.rate>=.2?'Above target':'Target 20%'}</span></div><div style="margin-top:auto;padding-top:18px">${bar(t.rate/0.4,'var(--accent)',null,0.5)}</div><div class="cap">Marker shows the 20% target</div></div>
     </div>
   </div>
+
+  ${billsCard()}
 
   <div class="grid w21">
     <div class="card chart"><div class="ch"><h3>Spending pace</h3><span class="s">${lastDay&&(tb||spentNow)?(diff>0?'<span class="neg">'+money(diff)+' ahead of budget pace</span>':'<span class="pos">'+money(Math.abs(diff))+' under budget pace</span>'):'No data yet'}</span></div>
@@ -1300,6 +1346,7 @@ V.settings=()=>`
       <label class="field" style="max-width:260px">Currency<select class="inp" id="sCur">${['AUD','NZD','USD','GBP','EUR','CAD'].map(c=>`<option ${S.settings.currency===c?'selected':''}>${c}</option>`).join('')}</select></label>
       <p class="muted" style="margin-top:16px;font-size:13px">${SB.user?'Your data is saved in this browser and synced to your account.':'Your data is stored in this browser only. Sign in to sync it, or export a backup from time to time.'}</p>
     </div>
+    <div class="card" id="remindCard">${remindCard()}</div>
     <div class="card"><div class="ch"><h3>Backup and restore</h3></div>
       <p class="muted" style="font-size:13px;margin-bottom:14px">Last backup: <b style="color:var(--ink);font-weight:500">${S.flags.backupAt?dLabel(iso(new Date(S.flags.backupAt))):'never'}</b>. A backup is a file you can keep anywhere and import later.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" data-act="export">${ic('download',16)}Export backup</button><label class="btn sec" style="cursor:pointer">${ic('upload',16)}Import backup<input type="file" accept=".json,application/json" id="importFile" hidden></label></div>
@@ -1671,6 +1718,9 @@ document.addEventListener('click',e=>{
   if(a==='ruleDel'){const r=(S.rules||[]).find(x=>x.id===el.dataset.id);S.rules=S.rules.filter(x=>x.id!==el.dataset.id);save();render(true);if(r)toast('Rule removed',r.match,'info');return}
   if(a==='more'){$('#msheet').classList.toggle('open');return}
   if(a==='txEdit'){openModal('edit',el.dataset.id);return}
+  if(a==='alertsOn'){if(!('Notification' in window))return;Notification.requestPermission().then(p=>{S.settings.phoneAlerts=p==='granted';save();$('#remindCard').innerHTML=remindCard();if(p==='granted'){toast('Phone alerts on','You will get a pop-up when a bill is close','good');sysNotify('Phone alerts are on','Bill reminders will show up like this','test')}else toast('Alerts not allowed','You can change this in your browser settings','warn')});return}
+  if(a==='alertsOff'){S.settings.phoneAlerts=false;save();$('#remindCard').innerHTML=remindCard();return}
+  if(a==='alertsTest'){sysNotify('Test alert','Bill reminders will show up like this','test');return}
   if(a==='recNew'){openModal('new');$('#fRepeat').value='monthly';return}
   if(a==='recEdit'){openModal('rule',el.dataset.id);return}
   if(a==='recDel'){const r=S.recurring.find(x=>x.id===el.dataset.id);S.recurring=S.recurring.filter(x=>x.id!==el.dataset.id);save();render(true);if(r)toast('Stopped repeating '+(r.note||r.cat),'Past transactions are kept','info');return}
@@ -1717,6 +1767,7 @@ document.addEventListener('change',e=>{const t=e.target;
   if(t.id==='fc'){F.cat=t.value;renderTxList()}
   else if(t.id==='pcut'){P.cut=t.value;renderCut()}
   else if(t.id==='sCur'){S.settings.currency=t.value;save();render()}
+  else if(t.id==='sRemind'){S.settings.remind=+t.value;checkBills(true);save();toast(+t.value?'Bill reminders on':'Bill reminders off',+t.value?'You will be reminded '+t.selectedOptions[0].text.toLowerCase():'Turn them back on any time here','info')}
   else if(t.id==='bankFile'&&t.files[0]){const r=new FileReader();r.onload=()=>{try{const res=importBankCSV(String(r.result));save();render(true);toast(res.added+' transaction'+(res.added===1?'':'s')+' imported',(res.dup?res.dup+' duplicates skipped. ':'')+'Categories were guessed, check them in Transactions','good');evalChallenges();save()}catch(err){toast('Could not read that file','Export a CSV statement from your bank and try again','bad')}t.value=''};r.readAsText(t.files[0])}
   else if(t.id==='importFile'&&t.files[0]){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.txns))throw 0;S=Object.assign(fresh(),d,{syncUid:S.syncUid,syncAt:S.syncAt,view:S.view});S.flags.welcomed=true;S.flags.sample=false;save();render();toast('Backup restored',S.txns.length+' transactions loaded','good')}catch(err){toast('Import failed','Choose a Moneyboard backup file (.json)','bad')}};r.readAsText(t.files[0])}
 });
@@ -1748,7 +1799,7 @@ document.addEventListener('keydown',e=>{
 /* ============ Boot ============ */
 const bootRec=runRecurring();recurringNotice(bootRec,true);
 checkAlerts(true);evalChallenges(true);save(true);render();renderSync();sbLoad();
-document.addEventListener('visibilitychange',()=>{if(document.hidden){if(SB.user&&(S.savedAt||0)>(S.syncAt||0))pushNow();return}if(SB.user){pull();return}const n=runRecurring();if(n){recurringNotice(n);commit()}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){if(SB.user&&(S.savedAt||0)>(S.syncAt||0))pushNow();return}const bills=()=>{const c=Object.keys(S.alerted).length;checkBills();if(Object.keys(S.alerted).length!==c){save();render(true)}};if(SB.user){pull().then(bills);return}const n=runRecurring();if(n){recurringNotice(n);commit()}else bills()});
 addEventListener('online',()=>{if(SB.user)pull()});
 if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 setTimeout(()=>{
