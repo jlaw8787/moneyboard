@@ -64,6 +64,18 @@ svg.i{flex:none;display:block}
 .btn:active{transform:scale(.98)}
 .btn.pri{background:var(--accent);color:#fff;box-shadow:0 1px 2px rgba(14,122,92,.25)}
 .btn.pri:hover{background:var(--accent-2)}
+.modal .box.rvbox{max-width:620px}
+.rvs{margin-bottom:18px}.rvs h3{font-size:14px;font-weight:600;color:var(--ink);display:flex;justify-content:space-between;align-items:baseline;gap:8px}.rvs h3 .s{font-size:12px;font-weight:400;color:var(--muted)}
+.rvs>.subtle{font-size:12.5px;margin:2px 0 8px}
+.rvp{display:flex;gap:12px;align-items:flex-start;padding:10px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;cursor:pointer}.rvp.on{border-color:var(--accent);background:var(--accent-soft)}
+.rvp input,.rvrem input{accent-color:var(--accent);width:16px;height:16px;margin-top:8px;flex:none}.rvp .grow{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.rvp .nm{font-weight:500;color:var(--ink)}.rvp .sb{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rvg{padding:10px 0;border-bottom:1px solid var(--line2)}.rvh{display:flex;gap:12px;align-items:center}.rvh .grow{flex:1;min-width:0}.rvh .nm{font-weight:500;color:var(--ink);text-transform:capitalize;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rvh .sb{font-size:12.5px;color:var(--muted)}
+.rvh select.inp.sm{height:34px;font-size:13px;max-width:190px;flex:none}
+.rvrem{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--ink);margin:8px 0 0 44px}.rvrem label{cursor:pointer}.rvrem .rvkey{height:28px;font-size:12.5px;padding:0 8px;width:150px}.rvrem input{margin-top:0}
+.rvg details{margin:6px 0 0 44px}.rvg summary{font-size:12.5px;color:var(--accent);cursor:pointer}
+.rvi{display:flex;gap:10px;font-size:12.5px;color:var(--muted);padding:5px 0;border-bottom:1px dashed var(--line2)}.rvi .grow{flex:1;min-width:0;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rvf{position:sticky;bottom:-24px;background:var(--surface);padding:12px 0 0;margin-top:4px}
+@media (max-width:560px){.rvh{flex-wrap:wrap}.rvh select.inp.sm{max-width:none;width:calc(100% - 44px);margin-left:44px}.rvrem .rvkey{width:120px}}
 .card.drop{transition:box-shadow .15s,background .15s}.card.drop.over{box-shadow:0 0 0 2px var(--accent);background:var(--accent-soft)}
 .btn.sec{background:var(--surface);border:1px solid var(--line);color:var(--text);box-shadow:var(--shadow)}
 .btn.sec:hover{background:var(--hover)}
@@ -524,6 +536,7 @@ select.inp{padding-right:30px;appearance:none;background-image:url("data:image/s
 <div class="modal" id="authModal" role="dialog" aria-modal="true" aria-label="Account"><div class="box" id="authBox" style="max-width:400px"></div></div>
 <div class="modal" id="ach" role="dialog" aria-modal="true" aria-label="Achievement"><div class="box achbox" id="achBox"></div></div>
 <div class="modal" id="wiz" role="dialog" aria-modal="true" aria-label="Budget setup"><div class="box wbox" id="wizBox"></div></div>
+<div class="modal" id="reviewModal" role="dialog" aria-modal="true" aria-label="Review import"><div class="box rvbox" id="reviewBox"></div></div>
 <div class="modal" id="itemModal" role="dialog" aria-modal="true" aria-label="Budget item"><div class="box" id="itemBox"></div></div>
 
 <script>
@@ -1378,7 +1391,7 @@ V.settings=()=>`
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" data-act="demo">${ic('refresh',16)}Reload sample data</button><button class="btn dng" data-act="clear">${ic('trash',16)}<span>Clear all data</span></button></div>
     </div>
     <div class="card drop" data-drop="bank"><div class="ch"><h3>Import from your bank</h3></div>
-      <p class="muted" style="font-size:13px;margin-bottom:14px">Download a CSV statement from each of your banks (usually under Statements or Export), then pick them all here at once, or drag them onto this card. Each bank's layout is worked out for you, categories are guessed, and anything already imported is skipped, so overlapping dates are fine.</p>
+      <p class="muted" style="font-size:13px;margin-bottom:14px">Download a CSV statement from each of your banks (usually under Statements or Export), then pick them all here at once, or drag them onto this card. Each bank's layout is worked out for you and anything already imported is skipped, so overlapping dates are fine. You then get a review screen to match transfers between your accounts and fix categories before anything is saved.</p>
       <label class="btn sec" style="cursor:pointer">${ic('upload',16)}Import bank CSVs<input type="file" accept=".csv,text/csv" id="bankFile" multiple hidden></label>
     </div>
     <div class="card"><div class="ch"><h3>Category rules</h3><span class="s">${(S.rules||[]).length} saved</span></div>
@@ -1592,40 +1605,115 @@ function csvLayout(rows){
   const signed=c=>/^[+-]/.test(String(c||'').trim());
   const bank=sample.length===4&&ai===1&&desc===2&&signed(sample[1])&&signed(sample[3])?'CommBank':sample.length===3&&ai===1&&desc===2?'ANZ':'';
   return {hi:-1,di,desc,ai,dr:-1,cr:-1,bank}}
-function importBankCSV(text){
+/* Read one statement into the staging list. Nothing is saved until the review is confirmed. */
+function stageBankCSV(text,staged,acct){
   const rows=parseCSV(String(text).replace(/^﻿/,''));if(!rows.length)throw 0;
   const L=csvLayout(rows);if(!L||L.di<0||(L.ai<0&&L.dr<0&&L.cr<0))throw 0;
-  // How many times each transaction is already stored. Counting (not just yes or no) keeps two real coffees on the same day from being treated as one.
-  const have=new Map();S.txns.forEach(t=>{const k=txKey(t);have.set(k,(have.get(k)||0)+1)});
-  const inFile=new Map();let added=0,dup=0,bad=0;
+  // How many times each transaction is already stored or staged. Counting (not just yes or no) keeps two real coffees on the same day from being treated as one.
+  const have=new Map();[...S.txns,...staged].forEach(t=>{const k=txKey(t);have.set(k,(have.get(k)||0)+1)});
+  const inFile=new Map();let added=0,dup=0,bad=0;const bank=L.bank||'';acct=bank||acct;
   for(const r of rows.slice(L.hi+1)){
     const date=parseDate(r[L.di]);if(!date){bad++;continue}
     let amt=L.ai>=0?csvAmt(r[L.ai]):(Math.abs(csvAmt(r[L.cr]))||0)-(Math.abs(csvAmt(r[L.dr]))||0);
     if(!amt||isNaN(amt)){bad++;continue}
     const note=(L.desc>=0?String(r[L.desc]||''):'').trim().replace(/\s+/g,' ').slice(0,60);
-    const t={id:uid(),date,type:amt<0?'expense':'income',amount:Math.abs(Math.round(amt*100)/100),note,src:'bank'};
+    const t={id:uid(),date,type:amt<0?'expense':'income',amount:Math.abs(Math.round(amt*100)/100),note,src:'bank',acct,dir:amt<0?'out':'in'};
     t.bk=t.date+'|'+t.amount.toFixed(2)+'|'+note.toLowerCase();
     const n=(inFile.get(t.bk)||0)+1;inFile.set(t.bk,n);if(n<=(have.get(t.bk)||0)){dup++;continue}
     t.cat=t.type==='income'?(/salary|pay|wage/i.test(note)?'Salary':'Other income'):guessCat(note);
     if(/internal transfer|own account|to savings|from savings|savings acc|offset acc|transfer to self/i.test(note)){t.type='transfer';t.cat='Transfer'}
-    const rl=findRule(note);if(rl&&(rl.type==='transfer'||rl.type===t.type)){t.type=rl.type;t.cat=rl.cat}
-    S.txns.push(t);added++;
+    const rl=findRule(note);if(rl&&(rl.type==='transfer'||rl.type===t.type)){t.type=rl.type;t.cat=rl.cat;t.ruled=1}
+    staged.push(t);added++;
   }
-  return {added,dup,bad,bank:L.bank};
+  return {added,dup,bad,bank};
 }
-/* Read one or more statement files, from any mix of banks, and report back in one message */
+/* Money moved between your own accounts shows up twice: out of one bank, into another. Find those pairs. */
+const XHINT=/transfer|trans to|trans from|tfr|xfer|osko|payid|internal|own acc|savings|from .*acc|to .*acc|netbank|fast payment|sweep/i;
+function findPairs(staged){
+  const isOut=t=>t.dir?t.dir==='out':t.type==='expense',isIn=t=>t.dir?t.dir==='in':t.type==='income';
+  const st=new Set(staged),pool=[...staged,...S.txns.filter(t=>t.src==='bank'&&!t.goal&&!t.pair)];
+  const pairs=[],used=new Set(),dayDiff=(a,b)=>Math.abs(new Date(a)-new Date(b))/864e5;
+  for(const o of pool.filter(isOut).sort((x,y)=>x.date<y.date?-1:1)){
+    if(used.has(o.id))continue;let best=null,bd=9;
+    for(const i of pool){
+      if(i===o||used.has(i.id)||!isIn(i)||i.amount!==o.amount)continue;
+      if(!st.has(o)&&!st.has(i))continue; // at least one side must be new
+      if(i.acct&&o.acct&&i.acct===o.acct)continue; // an account cannot pay itself
+      const d=dayDiff(i.date,o.date);if(d<=3&&d<bd){bd=d;best=i}
+    }
+    if(best){used.add(o.id);used.add(best.id);pairs.push({out:o,in:best,on:XHINT.test(o.note+' '+best.note)||o.type==='transfer'||best.type==='transfer',oldOut:!st.has(o),oldIn:!st.has(best)})}
+  }
+  return pairs;
+}
+let RV=null;
+function groupStaged(){
+  const g=new Map();
+  RV.staged.forEach(t=>{if(RV.pairIds.has(t.id))return;const key=t.type==='transfer'?'transfer':(normNote(t.note).split(' ').filter(x=>x.length>1).slice(0,2).join(' ')||'(no description)');const k=t.type+'|'+key;
+    if(!g.has(k))g.set(k,{k,key,type:t.type,cat:t.cat,items:[],total:0,remember:false,ruled:!!t.ruled});const x=g.get(k);x.items.push(t);x.total+=t.amount;if(x.cat!==t.cat)x.mixed=true});
+  const out=[...g.values()],first=k=>k.split(' ')[0],cnt={};out.forEach(x=>{cnt[first(x.key)]=(cnt[first(x.key)]||0)+1});
+  out.forEach(x=>{x.dkey=x.type==='transfer'||x.key==='(no description)'?x.key:cnt[first(x.key)]>1?x.key:(suggestKey(x.items[0].note)||x.key)});
+  return out.sort((a,b)=>{const o=x=>x.type==='transfer'?2:(x.cat==='Other'||x.cat==='Other income')?0:1;return o(a)-o(b)||b.items.length-a.items.length||b.total-a.total});
+}
 async function importBankFiles(files){
   files=[...files].filter(f=>/\.csv$/i.test(f.name)||/csv|text/.test(f.type));if(!files.length){toast('No CSV files found','Export a CSV statement from your bank and try again','bad');return}
-  let added=0,dup=0;const banks=[],failed=[];
-  for(const f of files){try{const r=importBankCSV(await f.text());added+=r.added;dup+=r.dup;const b=r.bank||'your bank';if(!banks.includes(b))banks.push(b)}catch(err){failed.push(f.name)}}
-  if(added||dup){save();render(true);evalChallenges();save()}
+  const staged=[],banks=[],failed=[];let dup=0;
+  for(const f of files){try{const r=stageBankCSV(await f.text(),staged,f.name.replace(/\.csv$/i,''));dup+=r.dup;const b=r.bank||'your bank';if(!banks.includes(b))banks.push(b)}catch(err){failed.push(f.name)}}
   const list=a=>a.length<3?a.join(' and '):a.slice(0,-1).join(', ')+' and '+a[a.length-1];
-  const fileWord=files.length-failed.length===1?'':' from '+(files.length-failed.length)+' files';
-  const fails=failed.length?' Could not read '+list(failed)+'.':'';
-  if(!added&&!dup){toast(failed.length===1&&files.length===1?'Could not read that file':'Could not read those files','Export a CSV statement from your bank and try again','bad');return}
-  if(!added){toast('Nothing new to import','All '+dup+' transaction'+(dup===1?' was':'s were')+' already in Moneyboard.'+fails,failed.length?'bad':'info');return}
-  toast(added+' transaction'+(added===1?'':'s')+' imported'+fileWord,(banks.length&&!(banks.length===1&&banks[0]==='your bank')?'Read as '+list(banks)+'. ':'')+(dup?dup+' already imported, skipped. ':'')+'Categories were guessed, check them in Transactions.'+fails,failed.length?'bad':'good');
+  if(!staged.length&&!dup){toast(files.length===1?'Could not read that file':'Could not read those files','Export a CSV statement from your bank and try again','bad');return}
+  if(!staged.length){toast('Nothing new to import','All '+dup+' transaction'+(dup===1?' was':'s were')+' already in Moneyboard.'+(failed.length?' Could not read '+list(failed)+'.':''),failed.length?'bad':'info');return}
+  const pairs=findPairs(staged);
+  RV={staged,pairs,dup,banks,failed,list,pairIds:new Set()};
+  pairs.forEach(p=>{if(p.on){RV.pairIds.add(p.out.id);RV.pairIds.add(p.in.id)}});
+  RV.groups=groupStaged();drawReview();$('#reviewModal').classList.add('open');
 }
+function catOptions(type,cur){const src=type==='income'?INCATS:CATS;return Object.keys(src).map(c=>`<option value="${esc(c)}" ${c===cur?'selected':''}>${esc(c)}</option>`).join('')+`<option value="__transfer" ${type==='transfer'?'selected':''}>Transfer between my accounts</option>`}
+function drawReview(){
+  const R=RV,n=R.staged.length,named=R.banks.filter(b=>b!=='your bank');
+  const otherCount=R.groups.filter(g=>g.cat==='Other'||g.cat==='Other income').reduce((a,g)=>a+g.items.length,0);
+  const pairRow=(p,i)=>`<label class="rvp${p.on?' on':''}"><input type="checkbox" data-rvpair="${i}" ${p.on?'checked':''}>
+    <span class="cat" style="width:32px;height:32px;background:${XFER.c}14;color:${XFER.c}">${ic('swap',16)}</span>
+    <span class="grow"><span class="nm">${money(p.out.amount,2)} on ${dLabel(p.out.date)}${p.on?'':' <span class="pill" style="background:var(--line2);color:var(--muted)">Possible match</span>'}</span>
+    <span class="sb">Out of ${esc(p.out.acct||'one account')}${p.oldOut?' (already imported)':''}: ${esc(p.out.note||'no description')}</span>
+    <span class="sb">Into ${esc(p.in.acct||'another account')}${p.oldIn?' (already imported)':''}: ${esc(p.in.note||'no description')}</span></span></label>`;
+  const grpRow=(g,i)=>{const inf=g.type==='transfer'?XFER:g.type==='income'?(INCATS[g.cat]||INCATS['Other income']):(CATS[g.cat]||CATS.Other);
+    return `<div class="rvg"><div class="rvh">${catChip(inf,32)}<div class="grow"><div class="nm">${esc(g.type==='transfer'?'Transfers':g.key)}</div><div class="sb">${g.items.length} transaction${g.items.length>1?'s':''} · ${g.type==='income'?'+':''}${money(g.total,2)}${g.ruled?' · sorted by your rule':''}</div></div>
+      <select class="inp sm" data-rvcat="${i}" aria-label="Category for ${esc(g.key)}">${catOptions(g.type,g.cat)}</select></div>
+      ${g.type!=='transfer'&&g.key!=='(no description)'?`<div class="rvrem"><input type="checkbox" data-rvrem="${i}" id="rvr${i}" ${g.remember?'checked':''}><label for="rvr${i}">Always sort</label><input class="inp rvkey" data-rvkey="${i}" value="${esc(g.rkey??g.dkey)}" aria-label="Words to match in future imports"><label for="rvr${i}">here</label></div>`:''}
+      <details><summary>Show transactions</summary>${g.items.slice().sort((a,b)=>a.date<b.date?1:-1).map(t=>`<div class="rvi"><span>${dLabel(t.date)}</span><span class="grow">${esc(t.note||'No description')}${t.acct?` <span class="subtle">· ${esc(t.acct)}</span>`:''}</span><span>${t.type==='income'?'+':''}${money(t.amount,2)}</span></div>`).join('')}</details></div>`};
+  const pairsOn=R.pairs.filter(p=>p.on).length;
+  $('#reviewBox').innerHTML=`<div class="mh"><h2>Review import</h2><button class="del" style="opacity:1" data-rv="cancel" aria-label="Close">${ic('x',16)}</button></div>
+    <p class="muted" style="font-size:13px;margin:-8px 0 16px">${n} new transaction${n>1?'s':''}${named.length?' from '+R.list(named):''}.${R.dup?' '+R.dup+' already imported, skipped.':''}${R.failed.length?' Could not read '+R.list(R.failed)+'.':''} Nothing is saved until you press Import.</p>
+    ${R.pairs.length?`<div class="rvs"><h3>Transfers between your accounts <span class="s">${pairsOn} of ${R.pairs.length} ticked</span></h3><p class="subtle">Ticked pairs count as transfers, so they are left out of your spending and income.</p>${R.pairs.map(pairRow).join('')}</div>`:''}
+    <div class="rvs"><h3>Categories <span class="s">${otherCount?otherCount+' in Other, worth a look':'grouped by merchant'}</span></h3><p class="subtle">Change a category to fix every transaction in that group at once. Tick Always sort here and future imports do it for you.</p>${R.groups.map(grpRow).join('')}</div>
+    <div class="row2 rvf"><button class="btn sec" data-rv="cancel">Cancel</button><button class="btn pri" data-rv="go">Import ${n} transaction${n>1?'s':''}</button></div>`;
+}
+function rvRegroup(){const old=RV.groups;RV.groups=groupStaged();RV.groups.forEach(g=>{const o=old.find(x=>x.k===g.k);if(o){g.remember=o.remember;g.rkey=o.rkey}});drawReview()}
+function rvCommit(){
+  const R=RV;let rules=0,xf=0,touched=0;
+  R.pairs.forEach(p=>{if(!p.on)return;[p.out,p.in].forEach(t=>{t.type='transfer';t.cat='Transfer';delete t.ruled});p.out.pair=p.in.id;p.in.pair=p.out.id;p.out.dir='out';p.in.dir='in';xf++});
+  R.groups.forEach(g=>{
+    if(g.remember&&g.type!=='transfer'&&g.key!=='(no description)'){
+      const key=normNote(g.rkey??g.dkey);if(!key)return;S.rules=(S.rules||[]).filter(r=>r.match!==key);S.rules.push({id:uid(),match:key,type:g.type,cat:g.cat});rules++;
+      S.txns.forEach(x=>{if(x.src==='bank'&&!x.goal&&!x.pair&&matchKey(x.note,key)&&x.type===g.type&&x.cat!==g.cat){x.cat=g.cat;touched++}});
+    }});
+  R.staged.forEach(t=>{delete t.ruled;S.txns.push(t)});
+  $('#reviewModal').classList.remove('open');RV=null;
+  const n=R.staged.length;
+  toast(n+' transaction'+(n>1?'s':'')+' imported',[xf?xf+' transfer'+(xf>1?'s':'')+' matched':'',rules?rules+' rule'+(rules>1?'s':'')+' saved':'',touched?touched+' older transaction'+(touched>1?'s':'')+' updated':''].filter(Boolean).join(', ')||'Categories are set, tweak any of them in Transactions','good');
+  commit();
+}
+$('#reviewModal').addEventListener('change',e=>{const t=e.target;if(!RV)return;
+  if(t.dataset.rvpair!=null){const p=RV.pairs[+t.dataset.rvpair];p.on=t.checked;RV.pairIds=new Set();RV.pairs.forEach(q=>{if(q.on){RV.pairIds.add(q.out.id);RV.pairIds.add(q.in.id)}});rvRegroup()}
+  else if(t.dataset.rvcat!=null){const g=RV.groups[+t.dataset.rvcat],v=t.value;
+    if(v==='__transfer'){g.items.forEach(x=>{x.type='transfer';x.cat='Transfer';delete x.ruled});rvRegroup();return}
+    if(g.type==='transfer'){const type=INCATS[v]?'income':'expense';g.items.forEach(x=>{x.type=type;x.cat=v});rvRegroup();return}
+    g.items.forEach(x=>{x.cat=v;delete x.ruled});g.cat=v;g.ruled=false;if(g.key!=='(no description)')g.remember=true;drawReview()}
+  else if(t.dataset.rvrem!=null){RV.groups[+t.dataset.rvrem].remember=t.checked}
+});
+$('#reviewModal').addEventListener('input',e=>{const t=e.target;if(!RV||t.dataset.rvkey==null)return;const g=RV.groups[+t.dataset.rvkey];g.rkey=t.value;const c=$('#rvr'+t.dataset.rvkey);if(c&&!c.checked&&t.value.trim()){c.checked=true;g.remember=true}});
+$('#reviewModal').addEventListener('click',e=>{const b=e.target.closest('[data-rv]');
+  if(e.target.id==='reviewModal'||(b&&b.dataset.rv==='cancel')){$('#reviewModal').classList.remove('open');if(RV)toast('Import cancelled','Nothing was saved','info');RV=null;return}
+  if(b&&b.dataset.rv==='go')rvCommit()});
 
 /* ============ Backup reminder and install ============ */
 const DAY=864e5;
