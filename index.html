@@ -480,6 +480,7 @@ button.shline{font-weight:500}
   .msheet button.active svg{color:var(--accent)}
   .npanel{left:12px;right:12px;width:auto;top:70px}
   #toasts{left:12px;right:12px;bottom:148px}.toast{width:auto}
+  body:has(.modal.open) #toasts{bottom:auto;top:calc(12px + env(safe-area-inset-top))}
   .brow{grid-template-columns:minmax(0,1fr) 110px;gap:8px 12px}.brow.hd{display:none}.brow .bb{grid-column:1/-1;order:3}.brow .sp,.brow .lf{display:none}
   .lvl{flex-direction:column;align-items:flex-start}
   .dwrap{grid-template-columns:1fr;justify-items:center}.dwrap .lst{width:100%}
@@ -506,7 +507,7 @@ button.shline{font-weight:500}
 }
 /* Joint boards */
 .bdwrap{position:relative;margin-bottom:4px}
-.bdsw{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px;border-radius:99px;background:#f1f2f4;color:var(--muted);font-size:12.5px;font-weight:500;position:relative}
+.bdsw[hidden]{display:none!important}.bdsw{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px;border-radius:99px;background:#f1f2f4;color:var(--muted);font-size:12.5px;font-weight:500;position:relative}
 .bdsw:hover{color:var(--ink);background:#e9ebef}.bdsw.joint{background:var(--accent-soft);color:var(--accent)}
 .bdsw span{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bdsw .dot{position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:var(--neg);border:2px solid var(--bg)}
@@ -901,8 +902,8 @@ function health(ym){
   return {score:Math.round(Object.values(parts).reduce((a,p)=>a+p[0],0)),parts};
 }
 function noSpendWeekend(){
-  if(S.txns.length<10)return false;const exp=new Set(S.txns.filter(t=>t.type==='expense').map(t=>t.date));
-  for(let i=1;i<=60;i++){const d=new Date();d.setDate(d.getDate()-i);if(d.getDay()===0){const s=new Date(d);s.setDate(d.getDate()-1);if(!exp.has(iso(d))&&!exp.has(iso(s)))return true}}return false;
+  if(S.txns.length<10)return false;const exp=new Set(S.txns.filter(t=>t.type==='expense').map(t=>t.date)),first=S.txns.reduce((m,t)=>t.date<m?t.date:m,'9999');
+  for(let i=1;i<=60;i++){const d=new Date();d.setDate(d.getDate()-i);if(d.getDay()===0){const s=new Date(d);s.setDate(d.getDate()-1);if(iso(s)<first)break;if(!exp.has(iso(d))&&!exp.has(iso(s)))return true}}return false;
 }
 
 /* ============ Recurring ============ */
@@ -936,7 +937,7 @@ const CHALLENGES = [
   {id:'week',icon:'calendar',name:'Week warrior',desc:'Log something on 7 different days this month',xp:100,prog:()=>daysLogged(curYM())/7},
   {id:'streak',icon:'flame',name:'On a roll',desc:'Reach a 5 day logging streak',xp:120,prog:()=>streak()/5},
   {id:'streak14',icon:'zap',name:'Unstoppable',desc:'Reach a 14 day logging streak',xp:300,prog:()=>streak()/14},
-  {id:'saver20',icon:'percent',name:'The 20% club',desc:'Save 20% or more of this month\'s income',xp:200,prog:()=>{const t=totals(curYM());return t.inc?t.rate/0.2:0}},
+  {id:'saver20',icon:'percent',name:'The 20% club',desc:'Save 20% or more of a full month\'s income',xp:200,prog:()=>{const l=totals(shiftYM(curYM(),-1));if(l.inc&&l.rate>=0.2)return 1;const t=totals(curYM());return t.inc?Math.min(.99,t.rate/0.2):0}},
   {id:'chef',icon:'utensils',name:'Home cook',desc:'Reach the 20th with Dining under 60% of budget',xp:150,prog:()=>{
     const b=BM().Dining||0;if(!b)return 0;const sp=totals(curYM()).byCat.Dining||0,day=new Date().getDate(),ok=sp<=0.6*b;
     if(day>=20)return ok?1:Math.min(.99,0.6*b/sp);return Math.min(.95,day/20)*(ok?1:.5)}},
@@ -1453,7 +1454,7 @@ V.settings=()=>`
     </div>
     <div class="card"><div class="ch"><h3>Data</h3></div>
       <p class="muted" style="font-size:13px;margin-bottom:14px">Load sample data to see how everything works, or clear everything and start again.${SB.user?' Clearing also clears the data in your account.':''}</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" data-act="demo">${ic('refresh',16)}Reload sample data</button><button class="btn dng" data-act="clear">${ic('trash',16)}<span>Clear all data</span></button></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" data-act="demo">${ic('refresh',16)}<span>Reload sample data</span></button><button class="btn dng" data-act="clear">${ic('trash',16)}<span>Clear all data</span></button></div>
     </div>
     <div class="card drop" data-drop="bank"><div class="ch"><h3>Import from your bank</h3></div>
       <p class="muted" style="font-size:13px;margin-bottom:14px">Download a CSV statement from each of your banks (usually under Statements or Export), then pick them all here at once, or drag them onto this card. Each bank's layout is worked out for you and anything already imported is skipped, so overlapping dates are fine. You then get a review screen to match transfers between your accounts and fix categories before anything is saved.</p>
@@ -1801,8 +1802,8 @@ const AUTO=[
 function cleanDesc(v){return String(v||'').toLowerCase().replace(/value date:?\s*[\d\/.\-]+/g,' ').replace(/card\s*(no\.?|number)?\s*[x*]*\d+/g,' ').replace(/\b(xx+|x{2,}\d+)\b/g,' ').replace(/[^a-z& ]+/g,' ')
   .replace(/\b(visa|mastercard|eftpos|debit|credit|purchase|pos|aus|au|aust|australia|nsw|qld|vic|wa|sa|tas|act|nt|pty|ltd|sq|sp|pending|tap|pay|contactless|ref|reference|receipt|no|the|of|and|at|in|on|ap|apple|google|wdl|atm|dd|trn|direct|paypal|commbank|netbank|app|own|account)\b/g,' ').replace(/\s+/g,' ').trim()}
 const TOKC=new Map();const descToks=v=>{const k=String(v||'');let r=TOKC.get(k);if(!r){r=[...new Set(cleanDesc(k).split(' ').filter(w=>w.length>1))];if(TOKC.size>5000)TOKC.clear();TOKC.set(k,r)}return r};
-function simDesc(a,b){const x=descToks(a),y=new Set(descToks(b));if(!x.length||!y.size){const r=v=>String(v||'').toLowerCase().replace(/^own account:\s*/,'').replace(/[^a-z0-9]+/g,' ').trim();return r(a)&&r(a)===r(b)?1:0}return x.filter(w=>y.has(w)).length/Math.min(x.length,y.size)}
-const merchKey=v=>descToks(v).slice(0,2).join(' ');
+function simDesc(a,b){const x=descToks(a).filter(w=>!KEYSKIP.has(w)),y=new Set(descToks(b).filter(w=>!KEYSKIP.has(w)));if(!x.length||!y.size){const r=v=>String(v||'').toLowerCase().replace(/^own account:\s*/,'').replace(/[^a-z0-9]+/g,' ').trim();return r(a)&&r(a)===r(b)?1:0}return x.filter(w=>y.has(w)).length/Math.min(x.length,y.size)}
+const merchKey=v=>descToks(v).filter(w=>!KEYSKIP.has(w)).slice(0,2).join(' ');
 function catGuess(d){const raw=String(d||'').toLowerCase(),c=[' '+cleanDesc(d)+' ',raw.replace(/[^a-z ]+/g,' '),raw.replace(/[^a-z0-9 ]+/g,' ')];for(const [r,cat] of AUTO)if(c.some(x=>r.test(x)))return [cat,true];return ['Other',false]}
 function guessCat(d){return catGuess(d)[0]}
 /* A short, specific key for a merchant or payee, skipping bank words like Direct Debit, Transfer To, SQ * */
@@ -1851,6 +1852,7 @@ function csvLayout(rows){
 function ownTransfer(note,own){
   const n=String(note||'').toLowerCase();
   if(/^own account/.test(n)||/payment received|payment - thank you|payment thankyou|internal transfer|own account|to savings|from savings|savings acc|offset acc|transfer to self/.test(n))return true;
+  if(/\b(transfer|tfr|xfer) to\b.*\b(savings?|saver|offset)\b/.test(n))return true;
   let m=n.match(/transfer (?:to|from) (xx\d{3,})/);if(m&&own.refs.has(m[1]))return true;
   m=n.match(/transfer from ([a-z][a-z .']+?)\s*(\||$)/);if(m&&own.names.has(m[1].trim()))return true;
   if(/transfer to other bank/.test(n)&&/\|\s*(saving|savings|joint|offset|own)\b/.test(n))return true;
@@ -2570,8 +2572,10 @@ function unknownCards(){
   const g=new Map();unknownList().forEach(t=>{const key=suggestKey(t.note)||'(no description)',k=t.type+'|'+key;if(!g.has(k))g.set(k,{k,key,type:t.type,items:[],total:0});const x=g.get(k);x.items.push(t);x.total+=fullAmt(t)});
   const known=S.txns.filter(t=>!t.from&&!t.goal&&t.cat&&t.cat!=='Other'&&t.cat!=='Other income'&&t.type!=='transfer');
   return [...g.values()].map(c=>{const n=c.items[0].note;let sug=null;
-    const sim=known.filter(t=>t.type===c.type).map(t=>[t,simDesc(n,t.note)]).filter(x=>x[1]>=.5).sort((a,b)=>b[1]-a[1])[0];
-    if(sim)sug={cat:sim[0].cat,why:'Looks like '+sim[0].note.slice(0,30)};
+    const xfer=c.type!=='income'&&/\b(savings?|saver|offset|goal saver|netbank saver|bonus saver|hisa)\b/i.test(n)&&/\b(transfer|xfer|tfr|to)\b/i.test(n);
+    const sim=xfer?null:known.filter(t=>t.type===c.type).map(t=>[t,simDesc(n,t.note)]).filter(x=>x[1]>=.5).sort((a,b)=>b[1]-a[1])[0];
+    if(xfer)sug={cat:'__transfer',why:'Money moved to a savings account'};
+    else if(sim)sug={cat:sim[0].cat,why:'Looks like '+sim[0].note.slice(0,30)};
     else if(c.type==='income'&&/transfer from|fast transfer/i.test(n))sug={cat:'Other income',why:'Money from a person'};
     else if(/transfer to/i.test(n))sug={cat:'__keep',why:'Paid to a person'};
     c.sug=sug;c.paypal=c.key==='paypal';c.generic=GENKEY.has(c.key)||c.key==='(no description)';return c}).sort((a,b)=>b.total-a.total);
@@ -2608,7 +2612,7 @@ function soApply(choice){
   if(choice==='__keep'){const ok=S.settings.otherOk=S.settings.otherOk||[];const k=c.type+'|'+c.key;if(!ok.includes(k))ok.push(k);if(ok.length>300)ok.splice(0,ok.length-300);c.items.forEach(t=>t.sure=1)}
   else{const tr=choice==='__transfer';c.items.forEach(t=>{if(tr){t.type='transfer';t.cat='Transfer'}else t.cat=choice;t.sure=1});
     if(remember){const key=normNote(c.key);S.rules=(S.rules||[]).filter(r=>r.match!==key);S.rules.push({id:uid(),match:key,type:tr?'transfer':c.type,cat:tr?'Transfer':choice})}}
-  SO.sorted++;SO.txs+=c.items.length;soNext('r');
+  SO.sorted++;SO.txs+=c.items.length;save();soNext('r');
 }
 function soNext(dir){const el=$('#swCard');SO.i++;if(el&&!reduce){el.style.transition='transform .25s ease,opacity .25s';el.style.transform=`translateX(${dir==='l'?-140:140}%) rotate(${dir==='l'?-12:12}deg)`;el.style.opacity='0';setTimeout(drawSorter,230)}else drawSorter()}
 function soAccept(){const c=SO.cards[SO.i];if(!c)return;soApply(c.sug?c.sug.cat:'__keep')}
@@ -2698,7 +2702,7 @@ document.addEventListener('click',e=>{
     try{navigator.clipboard.writeText(data).then(()=>toast('Backup exported','Downloaded and copied to your clipboard','good'),()=>toast('Backup exported','The backup text is shown below','good'))}catch(err){toast('Backup exported','The backup text is shown below','good')}
     S.flags.backup=true;S.flags.backupAt=Date.now();commit();const b=$('#exportBox');if(b){b.style.display='block';b.value=data}
   }
-  else if(a==='demo'){const keep={xp:S.xp,unlocked:S.unlocked,settings:S.settings,notifs:S.notifs};S=Object.assign(fresh(),keep,{syncUid:S.syncUid,syncAt:S.syncAt});S.flags.welcomed=true;S.flags.sample=true;seed();S.view='dashboard';checkAlerts(true);evalChallenges(true);save();render();toast('Sample data loaded','','info')}
+  else if(a==='demo'){const hasReal=!S.flags.sample&&(S.txns.length||S.items.length||S.goals.length);if(hasReal&&!el.dataset.armed){el.dataset.armed=1;const lb=el.querySelector('span');if(lb)lb.textContent='This replaces your data. Click again';toast('Your data will be replaced','Sample data wipes your own transactions, budget and goals. Export a backup first if you want to keep them','bad');setTimeout(()=>{if(el.isConnected){delete el.dataset.armed;const l2=el.querySelector('span');if(l2)l2.textContent='Reload sample data'}},5000);return}if(hasReal&&S.syncUid){toast('Sign out first','Sample data cannot be loaded while your real data is syncing to your account','bad');return}const keep={xp:S.xp,unlocked:S.unlocked,settings:S.settings,notifs:S.notifs};S=Object.assign(fresh(),keep,{syncUid:S.syncUid,syncAt:S.syncAt});S.flags.welcomed=true;S.flags.sample=true;seed();S.view='dashboard';checkAlerts(true);evalChallenges(true);save();render();toast('Sample data loaded','','info')}
   else if(a==='clear'){if(el.dataset.armed){S=Object.assign(fresh(),{syncUid:S.syncUid,syncAt:S.syncAt});S.flags.welcomed=true;S.flags.since=Date.now();save();render();toast('All data cleared','Add your first transaction to begin','info')}else{el.dataset.armed=1;el.querySelector('span').textContent='Click again to confirm';setTimeout(()=>{if(el.isConnected){delete el.dataset.armed;el.querySelector('span').textContent='Clear all data'}},4000)}}
 });
 document.addEventListener('input',e=>{const t=e.target;
