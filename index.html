@@ -74,6 +74,9 @@ svg.i{flex:none;display:block}
 .rvrem{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--ink);margin:8px 0 0 44px}.rvrem label{cursor:pointer}.rvrem .rvkey{height:28px;font-size:12.5px;padding:0 8px;width:150px}.rvrem input{margin-top:0}
 .rvg details{margin:6px 0 0 44px}.rvg summary{font-size:12.5px;color:var(--accent);cursor:pointer}
 .rvi{display:flex;gap:10px;font-size:12.5px;color:var(--muted);padding:5px 0;border-bottom:1px dashed var(--line2)}.rvi .grow{flex:1;min-width:0;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rva{padding:10px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px}.rvah{display:flex;gap:12px;align-items:center}.rvah .grow{flex:1;min-width:0}.rvah .nm{font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rvah .sb{font-size:12.5px;color:var(--muted)}
+.rvaf{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin:10px 0 0 44px}.rvaf .inp{height:34px;font-size:13px}.rvwhy{font-size:12px;margin:6px 0 0 44px}
+@media (max-width:560px){.rvaf{grid-template-columns:1fr;margin-left:0}.rvwhy{margin-left:0}}
 .rvf{position:sticky;bottom:-24px;background:var(--surface);padding:12px 0 0;margin-top:4px}
 @media (max-width:560px){.rvh{flex-wrap:wrap}.rvh select.inp.sm{max-width:none;width:calc(100% - 44px);margin-left:44px}.rvrem .rvkey{width:120px}}
 .card.drop{transition:box-shadow .15s,background .15s}.card.drop.over{box-shadow:0 0 0 2px var(--accent);background:var(--accent-soft)}
@@ -237,7 +240,11 @@ select.inp{padding-right:30px;appearance:none;background-image:url("data:image/s
 .goal .gm{display:flex;align-items:center;gap:18px;margin:20px 0}
 .shline{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:10px}
 button.shline{font-weight:500}
-.shfield{margin-top:12px}
+.shfield{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.shsplit{display:grid;grid-template-columns:minmax(0,1fr) 110px;gap:8px;margin-top:4px}.shsplit .shhint{grid-column:1/-1}.shsplit[hidden],.shpct[hidden]{display:none}
+.rform{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.rform .inp{height:34px;font-size:13px}.rform .jasel{max-width:none;width:100%}
+.jarow .janame{height:30px;font-size:13px;font-weight:500;border-color:transparent;background:transparent;padding:0 6px;margin-left:-6px}.jarow .janame:hover,.jarow .janame:focus{border-color:var(--line);background:var(--surface)}
+@media (max-width:560px){.rform{grid-template-columns:1fr 1fr}.jarow{flex-wrap:wrap}}
 .shhint{font-size:12px;color:var(--subtle);font-weight:400}
 .jasel{width:auto;max-width:170px;height:32px;font-size:12.5px}
 .ring{position:relative;flex:none}
@@ -895,7 +902,7 @@ function nextDate(d,f,day){
 }
 function runRecurring(){
   const today=iso(new Date());let n=0;
-  (S.recurring||[]).forEach(r=>{let g=0;while(r.next<=today&&g<500){const rid='r-'+r.id+'-'+r.next;if(!S.txns.some(x=>x.id===rid))S.txns.push({id:rid,date:r.next,type:r.type,amount:r.amount,cat:r.cat,note:r.note,rec:r.id,auto:true});r.next=nextDate(r.next,r.freq,r.day);n++;g++}});
+  (S.recurring||[]).forEach(r=>{let g=0;while(r.next<=today&&g<500){const rid='r-'+r.id+'-'+r.next;if(!S.txns.some(x=>x.id===rid))S.txns.push(Object.assign({id:rid,date:r.next,type:r.type,amount:r.amount,cat:r.cat,note:r.note,rec:r.id,auto:true},r.full!=null?{full:r.full,sp:'auto'}:{}));r.next=nextDate(r.next,r.freq,r.day);n++;g++}});
   return n;
 }
 function recurringNotice(n,quiet){if(!n)return;const b='Repeating items were added on their due dates';notify(n+' repeating transaction'+(n>1?'s':'')+' logged',b,'info');if(!quiet)toast(n+' repeating transaction'+(n>1?'s':'')+' logged',b,'info')}
@@ -1346,7 +1353,7 @@ V.goals=()=>{
       <form id="goalForm" style="display:flex;flex-direction:column;gap:12px">
         <label class="field">Name<input class="inp" id="gName" required maxlength="40" placeholder="Holiday, house deposit, new laptop"></label>
         <div class="row2"><label class="field">Target<input class="inp" id="gTarget" type="number" min="1" required placeholder="5000"></label><label class="field">Saved so far<input class="inp" id="gSaved" type="number" min="0" placeholder="0"></label></div>
-        ${shareField('gShare','')}
+        ${shareField('gShare','','Your partner sees the goal and can add to it on the joint board.','goals',null)}
         <div class="field">Icon<div class="icopick" id="gIcon">${GOAL_ICONS.map((n,i)=>`<button type="button" class="${i?'':'on'}" data-i="${n}" aria-label="${n}">${ic(n,17)}</button>`).join('')}</div></div>
         <button class="btn pri" type="submit">${ic('plus',16,2)}Create goal</button>
       </form>
@@ -1617,7 +1624,7 @@ function animate(quiet){
   document.querySelectorAll('[data-count]').forEach(el=>{const to=+el.dataset.count,f=el.dataset.fmt,t0=performance.now(),dur=(reduce||quiet)?1:900;
     const step=now=>{const k=clamp((now-t0)/dur),e=1-Math.pow(1-k,3);el.textContent=fmtVal(to*e,f);if(k<1)requestAnimationFrame(step)};requestAnimationFrame(step)});
 }
-function commit(){checkAlerts();evalChallenges();save();render(true)}
+function commit(){applyAutoSplits();checkAlerts();evalChallenges();save();render(true)}
 
 /* ============ Static chrome ============ */
 $('#brandMark').innerHTML=ic('logo',16,2.2);$('#wMark').innerHTML=ic('logo',26,2.2);$('#mPrev').innerHTML=ic('chevL',16);$('#mNext').innerHTML=ic('chevR',16);
@@ -1628,13 +1635,13 @@ let fType='expense',fCat='Groceries',MM={mode:'new',id:null};
 function openModal(mode,id){
   mode=mode||'new';const t=mode==='edit'?S.txns.find(x=>x.id===id):mode==='rule'?S.recurring.find(x=>x.id===id):null;
   if(mode!=='new'&&!t)return;MM={mode,id:t?t.id:null};
-  fType=t?t.type:'expense';fCat=t?t.cat:'Groceries';$('#fAmount').value=t?t.amount:'';$('#fNote').value=t?(t.note||''):'';$('#curSym').textContent=curSymbol();
+  fType=t?t.type:'expense';fCat=t?t.cat:'Groceries';$('#fAmount').value=t?(t.full??t.amount):'';$('#fNote').value=t?(t.note||''):'';$('#curSym').textContent=curSymbol();
   $('#fDate').value=mode==='edit'?t.date:mode==='rule'?t.next:(S.month===curYM()?iso(new Date()):S.month+'-01');
   $('#fDateLab').textContent=mode==='rule'?'Next date':'Date';
   $('#mTitle').textContent=mode==='edit'?'Edit transaction':mode==='rule'?'Edit repeating item':'New transaction';
   $('#fRepRow').style.display=mode==='edit'?'none':'';$('#fRepeat').querySelector('[value="none"]').hidden=mode==='rule';$('#fRepeat').value=mode==='rule'?t.freq:'none';
   const info=mode==='edit'&&t.goal?'This came from a savings goal. Changing the amount updates the goal too.':mode==='edit'&&t.auto?'Logged automatically from a repeating item. To change future ones, edit it under Recurring on the Transactions page.':mode==='rule'?'Changes apply from the next date onwards. Transactions already logged stay as they are.':'';
-  $('#fShareRow').innerHTML=shareField('fShare',mode==='edit'?shOf('txns',t):mode==='rule'?shOf('recurring',t):'',mode==='edit'&&t.rec&&shInherit(t)?'Its repeating item is shared, so this follows it unless you change it here.':mode==='rule'?'Every transaction this logs goes across too, and the joint board gets the bill reminders.':'');
+  $('#fShareRow').innerHTML=shareField('fShare',mode==='edit'?shOf('txns',t):mode==='rule'?shOf('recurring',t):'',mode==='rule'?'Every transaction this logs goes across too, and the joint board gets the bill reminders.':'',mode==='rule'?'recurring':'txns',t);
   $('#fInfo').textContent=info;$('#fInfo').style.display=info?'':'none';
   $('#fDelWrap').style.display=mode==='new'?'none':'';$('#fDel').textContent=mode==='rule'?'Stop repeating':'Delete transaction';
   MM.bank=!!(t&&t.src==='bank');const showRule=mode==='edit'&&!!(t.note||'').trim()&&!t.goal;$('#fRuleRow').style.display=showRule?'':'none';$('#fRuleOn').checked=false;
@@ -1655,11 +1662,11 @@ function ruleNudge(){if(MM.mode==='edit'&&MM.bank&&$('#fRuleRow').style.display!
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')$('#modal').classList.remove('open')});
 $('#txForm').addEventListener('submit',e=>{
   e.preventDefault();const amt=Math.round(parseFloat($('#fAmount').value)*100)/100;if(!(amt>0))return;
-  const date=$('#fDate').value||iso(new Date()),note=$('#fNote').value.trim(),rep=$('#fRepeat').value,shEl=$('#fShare'),shv=shEl?shEl.value:null;
+  const date=$('#fDate').value||iso(new Date()),note=$('#fNote').value.trim(),rep=$('#fRepeat').value;
   if(MM.mode==='edit'){
     const t=S.txns.find(x=>x.id===MM.id);if(!t)return;
     if(t.goal){const g=S.goals.find(x=>x.id===t.goal),keep=fType==='expense'&&fCat==='Savings';if(g){const d=(keep?amt:0)-t.amount;g.saved=Math.max(0,Math.round((g.saved+d)*100)/100);if(g.from)g.extra=Math.max(0,Math.round(((+g.extra||0)+d)*100)/100)}if(!keep)delete t.goal}
-    Object.assign(t,{type:fType,amount:amt,cat:fCat,date,note});if(shv!==null)setSh('txns',t,shv);$('#modal').classList.remove('open');
+    const wasSplit=t.full!=null&&t.sp!=='me'?splitPct('txns',t):100;Object.assign(t,{type:fType,amount:amt,cat:fCat,date,note});delete t.full;if($('#fShare'))readShare('fShare','txns',t);else if(wasSplit<100)setSplit('txns',t,wasSplit,'auto');$('#modal').classList.remove('open');
     const key=normNote($('#fRuleKey').value);
     if($('#fRuleRow').style.display!=='none'&&$('#fRuleOn').checked&&key){
       S.rules=(S.rules||[]).filter(r=>r.match!==key);S.rules.push({id:uid(),match:key,type:fType,cat:fCat});
@@ -1670,13 +1677,13 @@ $('#txForm').addEventListener('submit',e=>{
   }
   if(MM.mode==='rule'){
     const r=S.recurring.find(x=>x.id===MM.id);if(!r)return;
-    Object.assign(r,{type:fType,amount:amt,cat:fCat,note,freq:rep==='none'?r.freq:rep,next:date,day:+date.slice(8)});if(shv!==null)setSh('recurring',r,shv);
+    Object.assign(r,{type:fType,amount:amt,cat:fCat,note,freq:rep==='none'?r.freq:rep,next:date,day:+date.slice(8)});delete r.full;readShare('fShare','recurring',r);
     $('#modal').classList.remove('open');recurringNotice(runRecurring());toast('Repeating item updated',(note||fCat)+', next on '+dLabel(r.next),'good');commit();return;
   }
   const t={id:uid(),date,type:fType,amount:amt,cat:fCat,note};
   S.txns.push(t);$('#modal').classList.remove('open');
-  if(rep!=='none'){const r={id:uid(),type:fType,amount:amt,cat:fCat,note,freq:rep,day:+date.slice(8)};r.next=nextDate(date,rep,r.day);if(shv)r.sh=shv;t.rec=r.id;S.recurring.push(r);recurringNotice(runRecurring())}
-  else if(shv)setSh('txns',t,shv);
+  if(rep!=='none'){const r={id:uid(),type:fType,amount:amt,cat:fCat,note,freq:rep,day:+date.slice(8)};r.next=nextDate(date,rep,r.day);readShare('fShare','recurring',r);if(r.full!=null){t.full=r.full;t.amount=r.amount;t.sp='auto'}t.rec=r.id;S.recurring.push(r);recurringNotice(runRecurring())}
+  else readShare('fShare','txns',t);
   toast(t.type==='income'?'Income added':'Expense added',(t.type==='income'?'+':'')+money(amt,2)+' · '+t.cat+(rep!=='none'?' · repeats':''),'good');
   S.month=t.date.slice(0,7);const xb=$('#addBtn').offsetParent?$('#addBtn'):$('#fab');gainXP(5,xb);completeMission('log');commit();
 });
@@ -1719,16 +1726,16 @@ function renderWiz(){
     <div class="rc"><span class="cat" style="width:44px;height:44px;border-radius:12px;background:${gi.c}14;color:${gi.c}">${ic(gi.i,22)}</span><div style="min-width:0"><div class="rn">${esc(w.name)}</div><div class="rh">${esc(w.hint)}</div></div></div>
     <div class="rp">${WIZ[W.i+1]?esc(WIZ[W.i+1].name):'Summary'}</div>
   </div>
-  <div class="amtwrap" style="border:0;padding:8px 0 14px;margin:0"><span>${sym}</span><input id="wAmt" type="text" inputmode="decimal" placeholder="0" value="${ex?ex.amt:''}" aria-label="Amount"></div>
+  <div class="amtwrap" style="border:0;padding:8px 0 14px;margin:0"><span>${sym}</span><input id="wAmt" type="text" inputmode="decimal" placeholder="0" value="${ex?(ex.full??ex.amt):''}" aria-label="Amount"></div>
   <div class="freq" id="wFreq">${Object.entries(FREQ).map(([k,[l]])=>`<button type="button" data-f="${k}" class="${k===W.f?'on':''}">${l}</button>`).join('')}</div>
-  <div class="conv" id="wConv">${convText(ex?ex.amt:0,W.f)}</div>
+  <div class="conv" id="wConv">${convText(ex?(ex.full??ex.amt):0,W.f)}</div>
   <div class="wfoot"><button class="btn sec" data-act="wizBack" ${W.i?'':'disabled'}>${ic('chevL',16)}Back</button><span style="flex:1"></span><button class="btn sec" data-act="wizSkip">Skip</button><button class="btn pri" data-act="wizNext">Next${ic('chevR',16)}</button></div>
   <div class="kbd">Enter saves and moves on · Up and down arrows spin through items</div>`;
   setTimeout(()=>{const a=$('#wAmt');if(a){a.focus();a.select()}},20);
 }
 function wizSave(){
   const w=WIZ[W.i],el=$('#wAmt');if(!w||!el)return;const v=parseAmt(el.value),ex=itemByKey(w.key);
-  if(v>0){if(ex){ex.amt=v;ex.freq=W.f}else S.items.push({id:uid(),key:w.key,cat:w.cat,name:w.name,amt:v,freq:W.f})}
+  if(v>0){if(ex){if(ex.full!=null){const p=splitPct('items',ex);ex.full=v;ex.amt=Math.round(v*p)/100}else ex.amt=v;ex.freq=W.f}else S.items.push({id:uid(),key:w.key,cat:w.cat,name:w.name,amt:v,freq:W.f})}
   else if(ex)S.items=S.items.filter(x=>x!==ex);
   save();
 }
@@ -1743,18 +1750,45 @@ function itemOpen(id,cat){
   <form id="itemForm" autocomplete="off" style="display:flex;flex-direction:column;gap:12px">
     <label class="field">Name<input class="inp" id="iName" required maxlength="50" value="${esc(it?it.name:'')}" placeholder="e.g. Car insurance"></label>
     <label class="field">Category<select class="inp" id="iCat">${GROUPS.map(g=>`<option value="${esc(g)}" ${sel===g?'selected':''}>${esc(g)}</option>`).join('')}</select></label>
-    <div class="amtwrap" style="border:0;padding:6px 0 4px;margin:0"><span>${esc(curSymbol())}</span><input id="iAmt" type="text" inputmode="decimal" placeholder="0" value="${it?it.amt:''}" aria-label="Amount"></div>
+    <div class="amtwrap" style="border:0;padding:6px 0 4px;margin:0"><span>${esc(curSymbol())}</span><input id="iAmt" type="text" inputmode="decimal" placeholder="0" value="${it?(it.full??it.amt):''}" aria-label="Amount"></div>
     <div class="freq" id="iFreq">${Object.entries(FREQ).map(([k,[l]])=>`<button type="button" data-f="${k}" class="${k===IM.f?'on':''}">${l}</button>`).join('')}</div>
-    <div class="conv" id="iConv" style="margin:4px 0 6px">${convText(it?it.amt:0,IM.f)}</div>
-    ${shareField('iShare',it?shOf('items',it):'')}
+    <div class="conv" id="iConv" style="margin:4px 0 6px">${convText(it?(it.full??it.amt):0,IM.f)}</div>
+    ${shareField('iShare',it?shOf('items',it):'','','items',it)}
     <div class="row2"><button type="button" class="btn sec" data-act="itemClose">Cancel</button><button class="btn pri" type="submit">Save item</button></div>
   </form>`;
   $('#itemModal').classList.add('open');setTimeout(()=>$('#iName').focus(),30);
 }
 
 /* ============ Bank statement import (CSV) ============ */
-const AUTO=[[/woolworths|coles|aldi|iga|harris farm|foodworks|butcher/i,'Groceries'],[/uber eats|menulog|doordash|mcdonald|kfc|hungry jack|domino|cafe|coffee|restaurant|pizza|sushi|bar |pub|hotel/i,'Dining'],[/bp |shell|ampol|caltex|7-eleven|united petrol|fuel|linkt|toll|translink|opal|myki|parking|uber(?! eats)|didi/i,'Transport'],[/agl|origin|energy|energex|ergon|urban utilities|water|telstra|optus|vodafone|tpg|aussie broadband|belong|internet|nbn/i,'Utilities'],[/insurance|nrma|racq|budget direct|aami|allianz|medibank|bupa|hcf|nib|ahm/i,'Insurance'],[/netflix|spotify|stan|disney|binge|kayo|apple\.com|google|youtube|amazon prime|audible|microsoft/i,'Subscriptions'],[/chemist|pharmacy|priceline|medical|dental|physio|gym|fitness/i,'Health'],[/rent|real estate|mortgage|home loan|strata|council/i,'Housing'],[/school|childcare|early learning|oshc/i,'Kids & school'],[/vet|petbarn|pet stock|petstock/i,'Pets'],[/afterpay|zip pay|zippay|credit card|loan repay/i,'Debt'],[/kmart|target|big w|myer|david jones|bunnings|jb hi-fi|amazon|cotton on|uniqlo/i,'Personal'],[/cinema|event|ticketek|ticketmaster|hoyts|event cinemas|bowling/i,'Entertainment']];
-function guessCat(d){for(const [r,c] of AUTO)if(r.test(d))return c;return 'Other'}
+const AUTO=[
+ [/\b(woolworths|woolies|coles|aldi|iga|harris farm|foodworks|drakes|foodland|spar|costco|ritchies|butcher|bakers delight|fruit ?(and|&) ?veg|fresh market|supa ?iga)\b/,'Groceries'],
+ [/\b(uber ?eats|menulog|doordash|deliveroo|mcdonalds?|maccas|kfc|hungry jacks?|dominos|pizza ?hut|subway|guzman|grill d|nandos|red rooster|oporto|zambrero|sushi|cafe|coffee|espresso|bakery|restaurant|bistro|eatery|kitchen|thai|noodle|burger|kebab|bar|pub|tavern|brewery|starbucks|gloria jeans|muffin break|boost juice)\b/,'Dining'],
+ [/\b(bp|shell|ampol|caltex|7 ?eleven|united petrol|puma|metro petroleum|liberty|fuel|petrol|linkt|go ?via|e ?toll|translink|go card|opal|myki|parking|secure parking|wilson parking|uber|didi|ola|taxi|13cabs|tmr|rego|registration|qld transport|service nsw|vicroads|car wash|repco|supercheap|mycar|ultra tune)\b/,'Transport'],
+ [/\b(agl|origin energy|origin|energy ?australia|alinta|red energy|simply energy|powershop|momentum energy|energex|ergon|urban utilities|unitywater|sydney water|yarra valley water|sa water|water corp|telstra|optus|vodafone|tpg|iinet|aussie broadband|belong|superloop|amaysim|boost mobile|internet|nbn|gas)\b/,'Utilities'],
+ [/\b(insurance|insure|nrma|racq|racv|rac|budget direct|aami|allianz|suncorp insurance|youi|qbe|gio|apia|real insurance|bingle)\b/,'Insurance'],
+ [/\b(netflix|spotify|stan|disney|binge|kayo|foxtel|paramount|apple com|itunes|google (one|storage|play)|youtube|amazon prime|prime video|audible|microsoft|xbox|playstation|nintendo|adobe|canva|dropbox|icloud|chatgpt|openai|patreon)\b/,'Subscriptions'],
+ [/\b(chemist|chemist warehouse|pharmacy|priceline|terry white|medical|medicare|doctor|gp|clinic|dental|dentist|physio|chiro|optometrist|specsavers|pathology|hospital|gym|fitness|anytime fitness|f45|snap fitness|jetts|medibank|bupa|hcf|nib|ahm|hbf|gmhba)\b/,'Health'],
+ [/\b(rent|rental|real estate|ray white|lj hooker|harcourts|mortgage|home loan|strata|body corp|body corporate|council|rates)\b/,'Housing'],
+ [/\b(school|childcare|child care|early learning|kindy|kindergarten|oshc|tuition|uniform shop)\b/,'Kids & school'],
+ [/\b(vet|veterinary|petbarn|pet stock|petstock|pet circle|petcircle|my pet warehouse)\b/,'Pets'],
+ [/\b(afterpay|zip pay|zippay|zip money|humm|latitude|credit card|loan repay|repayment|klarna)\b/,'Debt'],
+ [/\b(kmart|target|big w|myer|david jones|bunnings|jb hi ?fi|harvey norman|the good guys|officeworks|amazon|ebay|cotton on|uniqlo|h ?m|zara|rebel|bcf|anaconda|catch|temu|shein|barber|hairdresser|salon|nails)\b/,'Personal'],
+ [/\b(cinema|cinemas|ticketek|ticketmaster|moshtix|hoyts|event cinemas|reading cinemas|palace|bowling|timezone|holey moley|dan murphys|bws|liquorland|first choice liquor|tab|sportsbet|ladbrokes|steam|airbnb|booking com|expedia|qantas|virgin australia|jetstar|rex airlines|webjet|wotif)\b/,'Entertainment']
+];
+/* Strip the bank noise (card numbers, value dates, state codes) so the merchant name is what is left */
+function cleanDesc(v){return String(v||'').toLowerCase().replace(/value date:?\s*[\d\/.\-]+/g,' ').replace(/card\s*(no\.?|number)?\s*[x*]*\d+/g,' ').replace(/\b(xx+|x{2,}\d+)\b/g,' ').replace(/[^a-z& ]+/g,' ')
+  .replace(/\b(visa|mastercard|eftpos|debit|credit|purchase|pos|aus|au|aust|australia|nsw|qld|vic|wa|sa|tas|act|nt|pty|ltd|sq|sp|pending|tap|pay|contactless|ref|reference|receipt|no|the|of|and|at|in|on|ap|apple|google|wdl|atm|dd|trn)\b/g,' ').replace(/\s+/g,' ').trim()}
+const descToks=v=>[...new Set(cleanDesc(v).split(' ').filter(w=>w.length>1))];
+function simDesc(a,b){const x=descToks(a),y=new Set(descToks(b));if(!x.length&&!y.size)return 1;if(!x.length||!y.size)return 0;return x.filter(w=>y.has(w)).length/Math.min(x.length,y.size)}
+const merchKey=v=>descToks(v).slice(0,2).join(' ');
+function guessCat(d){const c=' '+cleanDesc(d)+' ',raw=String(d||'').toLowerCase();for(const [r,cat] of AUTO)if(r.test(c)||r.test(raw.replace(/[^a-z ]+/g,' ')))return cat;return 'Other'}
+/* Learn from what you have already sorted: the latest category you used for the same merchant wins */
+function catHistory(){const h=new Map();S.txns.filter(t=>t.type==='expense'&&t.cat&&t.cat!=='Other'&&!t.goal&&!t.from).sort((a,b)=>a.date<b.date?-1:1).forEach(t=>{const k=merchKey(t.note);if(k)h.set(k,t.cat)});return h}
+const dayGap=(a,b)=>Math.abs(Date.parse(a)-Date.parse(b))/864e5;
+const fullAmt=t=>+(t.full!=null?t.full:t.amount)||0;
+const dirOf=t=>t.dir||(t.type==='income'?'in':'out');
+/* Same real transaction? Same amount and direction, within 3 days, and the cleaned descriptions mostly agree */
+function sameTx(a,b,anyAcct){if(Math.abs(fullAmt(a)-fullAmt(b))>.005||dirOf(a)!==dirOf(b)||dayGap(a.date,b.date)>3)return false;if(!anyAcct&&a.acct&&b.acct&&a.acct!==b.acct)return false;return simDesc(a.note,b.note)>=.5}
 function parseCSV(text){const rows=[];let row=[],cur='',q=false;for(let i=0;i<text.length;i++){const ch=text[i];if(q){if(ch==='"'){if(text[i+1]==='"'){cur+='"';i++}else q=false}else cur+=ch}else if(ch==='"')q=true;else if(ch===','){row.push(cur);cur=''}else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&text[i+1]==='\n')i++;row.push(cur);rows.push(row);row=[];cur=''}else cur+=ch}if(cur||row.length){row.push(cur);rows.push(row)}return rows.filter(r=>r.some(c=>c.trim()))}
 const MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
 function parseDate(v){v=String(v||'').trim().replace(/^"|"$/g,'');let m=v.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/),y;
@@ -1784,28 +1818,54 @@ function csvLayout(rows){
   const signed=c=>/^[+-]/.test(String(c||'').trim());
   const bank=sample.length===4&&ai===1&&desc===2&&signed(sample[1])&&signed(sample[3])?'CommBank':sample.length===3&&ai===1&&desc===2?'ANZ':'';
   return {hi:-1,di,desc,ai,dr:-1,cr:-1,bank}}
-/* Read one statement into the staging list. Nothing is saved until the review is confirmed. */
-function stageBankCSV(text,staged,acct){
+/* Read one statement into the staging list. Nothing is saved until the review is confirmed.
+   ctx carries what is shared across files in one import: matched existing transactions, category history. */
+function stageBankCSV(text,staged,file,ctx){
   const rows=parseCSV(String(text).replace(/^﻿/,''));if(!rows.length)throw 0;
   const L=csvLayout(rows);if(!L||L.di<0||(L.ai<0&&L.dr<0&&L.cr<0))throw 0;
-  // How many times each transaction is already stored or staged. Counting (not just yes or no) keeps two real coffees on the same day from being treated as one.
-  const have=new Map();[...S.txns,...staged].forEach(t=>{const k=txKey(t);have.set(k,(have.get(k)||0)+1)});
-  const inFile=new Map();let added=0,dup=0,bad=0;const bank=L.bank||'';acct=bank||acct;
+  const fi=ctx.files.length,F={fi,file,bank:L.bank||'',matched:[],maybe:0,added:0,dup:0,bad:0};ctx.files.push(F);
+  const inFile=new Map();
   for(const r of rows.slice(L.hi+1)){
-    const date=parseDate(r[L.di]);if(!date){bad++;continue}
+    const date=parseDate(r[L.di]);if(!date){F.bad++;continue}
     let amt=L.ai>=0?csvAmt(r[L.ai]):(Math.abs(csvAmt(r[L.cr]))||0)-(Math.abs(csvAmt(r[L.dr]))||0);
-    if(!amt||isNaN(amt)){bad++;continue}
+    if(!amt||isNaN(amt)){F.bad++;continue}
     const note=(L.desc>=0?String(r[L.desc]||''):'').trim().replace(/\s+/g,' ').slice(0,60);
-    const t={id:uid(),date,type:amt<0?'expense':'income',amount:Math.abs(Math.round(amt*100)/100),note,src:'bank',acct,dir:amt<0?'out':'in'};
+    const t={id:uid(),date,type:amt<0?'expense':'income',amount:Math.abs(Math.round(amt*100)/100),note,src:'bank',dir:amt<0?'out':'in',fi};
     t.bk=t.date+'|'+t.amount.toFixed(2)+'|'+note.toLowerCase();
-    const n=(inFile.get(t.bk)||0)+1;inFile.set(t.bk,n);if(n<=(have.get(t.bk)||0)){dup++;continue}
-    t.cat=t.type==='income'?(/salary|pay|wage/i.test(note)?'Salary':'Other income'):guessCat(note);
+    // Exact match first. Counting keeps two real coffees on the same day from being treated as one.
+    const n=(inFile.get(t.bk)||0)+1;inFile.set(t.bk,n);
+    const ex=(ctx.exact.get(t.bk)||[]).find(x=>!ctx.used.has(x.id));
+    if(ex&&n<=(ctx.exact.get(t.bk)||[]).length){ctx.used.add(ex.id);F.matched.push(ex);F.dup++;continue}
+    if(staged.some(x=>x.fi!==fi&&x.bk===t.bk&&!x.dupOf)){F.dup++;continue} // same statement picked twice
+    // Near match: same amount, within 3 days, description mostly the same. Held back for you to check.
+    const near=ctx.pool.find(x=>!ctx.used.has(x.id)&&sameTx(t,x,true));
+    if(near){ctx.used.add(near.id);t.dupOf=near.id;t.dupNote=near.note;t.dupDate=near.date;t.dupAcct=near.acct||'';F.maybe++}
+    t.cat=t.type==='income'?(/salary|pay|wage/i.test(note)?'Salary':'Other income'):(ctx.hist.get(merchKey(note))||guessCat(note));
     if(/internal transfer|own account|to savings|from savings|savings acc|offset acc|transfer to self/i.test(note)){t.type='transfer';t.cat='Transfer'}
     const rl=findRule(note);if(rl&&(rl.type==='transfer'||rl.type===t.type)){t.type=rl.type;t.cat=rl.cat;t.ruled=1}
-    staged.push(t);added++;
+    staged.push(t);if(!t.dupOf)F.added++;
   }
-  return {added,dup,bad,bank};
+  return F;
 }
+/* Work out which account a file belongs to: the account its overlapping transactions already sit in,
+   then what you called this file last time, then a name from the bank and any account number in the file name */
+function nameFiles(ctx,staged){
+  const map=S.settings.acctMap||{},taken=new Set();
+  ctx.files.forEach(F=>{
+    const cnt=new Map();F.matched.forEach(x=>{if(x.acct)cnt.set(x.acct,(cnt.get(x.acct)||0)+1)});
+    staged.forEach(t=>{if(t.fi===F.fi&&t.dupAcct)cnt.set(t.dupAcct,(cnt.get(t.dupAcct)||0)+1)});
+    const top=[...cnt.entries()].sort((a,b)=>b[1]-a[1])[0],stem=F.file.replace(/\.csv$/i,''),digits=(stem.match(/\d{4,}/g)||[]).pop(),mk=fileKey(F);
+    let name='',why='';
+    if(top&&top[0]&&top[0]!==F.bank){name=top[0];why='Matched to transactions you already have in this account'}
+    else if(map[mk]&&map[mk]!=='?'){name=map[mk];why='Remembered from your last import of this file'}
+    else if(top&&top[0]){name=top[0];why='Matched to earlier '+top[0]+' imports. Give it its own name if you have more than one account there'}
+    else{name=(F.bank?F.bank+' ':'')+(digits?'account '+digits.slice(-4):F.bank?'account':stem);why='New account. Name it so you can tell it apart, for example Everyday or Joint'}
+    let base=name,k=2;while(taken.has(name)){name=base+' '+k++}taken.add(name);
+    F.name=name;F.why=why;F.dest=jointOf(name)||'';F.orig=top&&top[0]===F.bank?F.bank:'';
+  });
+  staged.forEach(t=>{t.acct=ctx.files[t.fi].name});
+}
+const fileKey=F=>(F.bank||'csv')+'|'+F.file.replace(/\.csv$/i,'').toLowerCase().replace(/\(\d+\)|\s+\d+$/g,'').trim();
 /* Money moved between your own accounts shows up twice: out of one bank, into another. Find those pairs. */
 const XHINT=/transfer|trans to|trans from|tfr|xfer|osko|payid|internal|own acc|savings|from .*acc|to .*acc|netbank|fast payment|sweep/i;
 function findPairs(staged){
@@ -1827,7 +1887,7 @@ function findPairs(staged){
 let RV=null;
 function groupStaged(){
   const g=new Map();
-  RV.staged.forEach(t=>{if(RV.pairIds.has(t.id))return;const key=t.type==='transfer'?'transfer':(normNote(t.note).split(' ').filter(x=>x.length>1).slice(0,2).join(' ')||'(no description)');const k=t.type+'|'+key;
+  RV.staged.forEach(t=>{if(RV.pairIds.has(t.id)||t.dupOf&&!t.keep)return;const key=t.type==='transfer'?'transfer':(normNote(t.note).split(' ').filter(x=>x.length>1).slice(0,2).join(' ')||'(no description)');const k=t.type+'|'+key;
     if(!g.has(k))g.set(k,{k,key,type:t.type,cat:t.cat,items:[],total:0,remember:false,ruled:!!t.ruled});const x=g.get(k);x.items.push(t);x.total+=t.amount;if(x.cat!==t.cat)x.mixed=true});
   const out=[...g.values()],first=k=>k.split(' ')[0],cnt={};out.forEach(x=>{cnt[first(x.key)]=(cnt[first(x.key)]||0)+1});
   out.forEach(x=>{x.dkey=x.type==='transfer'||x.key==='(no description)'?x.key:cnt[first(x.key)]>1?x.key:(suggestKey(x.items[0].note)||x.key)});
@@ -1836,18 +1896,37 @@ function groupStaged(){
 async function importBankFiles(files){
   files=[...files].filter(f=>/\.csv$/i.test(f.name)||/csv|text/.test(f.type));if(!files.length){toast('No CSV files found','Export a CSV statement from your bank and try again','bad');return}
   const staged=[],banks=[],failed=[];let dup=0;
-  for(const f of files){try{const r=stageBankCSV(await f.text(),staged,f.name.replace(/\.csv$/i,''));dup+=r.dup;const b=r.bank||'your bank';if(!banks.includes(b))banks.push(b)}catch(err){failed.push(f.name)}}
+  const ctx={files:[],used:new Set(),exact:new Map(),pool:S.txns.filter(t=>!t.goal),hist:catHistory()};
+  S.txns.forEach(t=>{const k=txKey(t);if(!ctx.exact.has(k))ctx.exact.set(k,[]);ctx.exact.get(k).push(t)});
+  for(const f of files){try{const r=stageBankCSV(await f.text(),staged,f.name,ctx);dup+=r.dup;const b=r.bank||'your bank';if(!banks.includes(b))banks.push(b)}catch(err){failed.push(f.name)}}
+  nameFiles(ctx,staged);
   const list=a=>a.length<3?a.join(' and '):a.slice(0,-1).join(', ')+' and '+a[a.length-1];
   if(!staged.length&&!dup){toast(files.length===1?'Could not read that file':'Could not read those files','Export a CSV statement from your bank and try again','bad');return}
+  if(staged.length&&staged.every(t=>t.dupOf)){toast('Nothing new to import',staged.length+' look like transactions you already have, with a slightly different date or description. '+dup+' were exact matches.','info');return}
   if(!staged.length){toast('Nothing new to import','All '+dup+' transaction'+(dup===1?' was':'s were')+' already in Moneyboard.'+(failed.length?' Could not read '+list(failed)+'.':''),failed.length?'bad':'info');return}
-  const pairs=findPairs(staged);
-  RV={staged,pairs,dup,banks,failed,list,pairIds:new Set()};
+  const pairs=findPairs(staged.filter(t=>!t.dupOf));
+  RV={staged,pairs,dup,banks,failed,list,pairIds:new Set(),files:ctx.files.filter(F=>staged.some(t=>t.fi===F.fi)||F.matched.length)};
   pairs.forEach(p=>{if(p.on){RV.pairIds.add(p.out.id);RV.pairIds.add(p.in.id)}});
   RV.groups=groupStaged();drawReview();$('#reviewModal').classList.add('open');
 }
 function catOptions(type,cur){const src=type==='income'?INCATS:CATS;return Object.keys(src).map(c=>`<option value="${esc(c)}" ${c===cur?'selected':''}>${esc(c)}</option>`).join('')+`<option value="__transfer" ${type==='transfer'?'selected':''}>Transfer between my accounts</option>`}
+const rvIn=()=>RV.staged.filter(t=>!t.dupOf||t.keep);
+function rvAcctBlock(){
+  const R=RV,known=[...new Set(S.txns.map(x=>x.acct).filter(Boolean))].sort(),boards=SB.user&&BD.list.length?BD.list:[];
+  return `<div class="rvs"><h3>Accounts <span class="s">${R.files.length} file${R.files.length>1?'s':''}</span></h3><p class="subtle">Each file is one bank account. Give each account its own name so your joint and personal accounts stay apart.</p>
+    <datalist id="rvAccts">${known.map(a=>`<option value="${esc(a)}">`).join('')}</datalist>
+    ${R.files.map((F,i)=>{const n=R.staged.filter(t=>t.fi===F.fi&&(!t.dupOf||t.keep)).length;return `<div class="rva"><div class="rvah">${catChip({i:'bank',c:F.dest?'#0e7a5c':'#3f63a8'},32)}<div class="grow"><div class="nm">${esc(F.file)}</div><div class="sb">${n} new${F.dup?', '+F.dup+' already in':''}${F.bank?' · '+esc(F.bank)+' layout':''}</div></div></div>
+      <div class="rvaf"><label class="field">Account name<input class="inp" list="rvAccts" data-rvacct="${i}" value="${esc(F.name)}" maxlength="40"></label>
+      ${boards.length?`<label class="field">Goes to<select class="inp" data-rvdest="${i}"><option value="">Personal only</option>${boards.map(b=>`<option value="${b.id}" ${F.dest===b.id?'selected':''}>Personal and ${esc(b.name)}</option>`).join('')}</select></label>`:''}</div>
+      <p class="subtle rvwhy">${esc(F.why)}${F.orig&&F.orig!==F.name?`. Your older transactions filed as "${esc(F.orig)}" that match this file will be renamed to the account name above.`:''}</p></div>`}).join('')}</div>`;
+}
+function rvDupBlock(){
+  const d=RV.staged.filter(t=>t.dupOf);if(!d.length)return '';
+  return `<div class="rvs"><h3>Possibly already imported <span class="s">${d.filter(t=>t.keep).length} of ${d.length} will be added</span></h3><p class="subtle">These look like transactions you already have, with a slightly different date or description. They are skipped unless you tick them.</p>
+    ${d.map(t=>`<label class="rvp${t.keep?' on':''}"><input type="checkbox" data-rvkeep="${t.id}" ${t.keep?'checked':''}><span class="grow"><span class="nm">${t.type==='income'?'+':''}${money(t.amount,2)} on ${dLabel(t.date)}</span><span class="sb">New: ${esc(t.note||'no description')}</span><span class="sb">Already have: ${esc(t.dupNote||'no description')}, ${dLabel(t.dupDate)}${t.dupAcct?' · '+esc(t.dupAcct):''}</span></span></label>`).join('')}</div>`;
+}
 function drawReview(){
-  const R=RV,n=R.staged.length,named=R.banks.filter(b=>b!=='your bank');
+  const R=RV,n=rvIn().length,named=R.banks.filter(b=>b!=='your bank');
   const otherCount=R.groups.filter(g=>g.cat==='Other'||g.cat==='Other income').reduce((a,g)=>a+g.items.length,0);
   const pairRow=(p,i)=>`<label class="rvp${p.on?' on':''}"><input type="checkbox" data-rvpair="${i}" ${p.on?'checked':''}>
     <span class="cat" style="width:32px;height:32px;background:${XFER.c}14;color:${XFER.c}">${ic('swap',16)}</span>
@@ -1861,10 +1940,10 @@ function drawReview(){
       <details><summary>Show transactions</summary>${g.items.slice().sort((a,b)=>a.date<b.date?1:-1).map(t=>`<div class="rvi"><span>${dLabel(t.date)}</span><span class="grow">${esc(t.note||'No description')}${t.acct?` <span class="subtle">· ${esc(t.acct)}</span>`:''}</span><span>${t.type==='income'?'+':''}${money(t.amount,2)}</span></div>`).join('')}</details></div>`};
   const pairsOn=R.pairs.filter(p=>p.on).length;
   $('#reviewBox').innerHTML=`<div class="mh"><h2>Review import</h2><button class="del" style="opacity:1" data-rv="cancel" aria-label="Close">${ic('x',16)}</button></div>
-    <p class="muted" style="font-size:13px;margin:-8px 0 16px">${n} new transaction${n>1?'s':''}${named.length?' from '+R.list(named):''}.${R.dup?' '+R.dup+' already imported, skipped.':''}${R.failed.length?' Could not read '+R.list(R.failed)+'.':''} Nothing is saved until you press Import.</p>
-    ${R.pairs.length?`<div class="rvs"><h3>Transfers between your accounts <span class="s">${pairsOn} of ${R.pairs.length} ticked</span></h3><p class="subtle">Ticked pairs count as transfers, so they are left out of your spending and income.</p>${R.pairs.map(pairRow).join('')}</div>`:''}
+    <p class="muted" style="font-size:13px;margin:-8px 0 16px">${n} new transaction${n===1?'':'s'}${named.length?' from '+R.list(named):''}.${R.dup?' '+R.dup+' already imported, skipped.':''}${R.failed.length?' Could not read '+R.list(R.failed)+'.':''} Nothing is saved until you press Import.</p>
+    ${rvAcctBlock()}${rvDupBlock()}${R.pairs.length?`<div class="rvs"><h3>Transfers between your accounts <span class="s">${pairsOn} of ${R.pairs.length} ticked</span></h3><p class="subtle">Ticked pairs count as transfers, so they are left out of your spending and income.</p>${R.pairs.map(pairRow).join('')}</div>`:''}
     <div class="rvs"><h3>Categories <span class="s">${otherCount?otherCount+' in Other, worth a look':'grouped by merchant'}</span></h3><p class="subtle">Change a category to fix every transaction in that group at once. Tick Always sort here and future imports do it for you.</p>${R.groups.map(grpRow).join('')}</div>
-    <div class="row2 rvf"><button class="btn sec" data-rv="cancel">Cancel</button><button class="btn pri" data-rv="go">Import ${n} transaction${n>1?'s':''}</button></div>`;
+    <div class="row2 rvf"><button class="btn sec" data-rv="cancel">Cancel</button><button class="btn pri" data-rv="go" ${n?'':'disabled'}>Import ${n} transaction${n===1?'':'s'}</button></div>`;
 }
 function rvRegroup(){const old=RV.groups;RV.groups=groupStaged();RV.groups.forEach(g=>{const o=old.find(x=>x.k===g.k);if(o){g.remember=o.remember;g.rkey=o.rkey}});drawReview()}
 function rvCommit(){
@@ -1875,13 +1954,26 @@ function rvCommit(){
       const key=normNote(g.rkey??g.dkey);if(!key)return;S.rules=(S.rules||[]).filter(r=>r.match!==key);S.rules.push({id:uid(),match:key,type:g.type,cat:g.cat});rules++;
       S.txns.forEach(x=>{if(x.src==='bank'&&!x.goal&&!x.pair&&!x.from&&matchKey(x.note,key)&&x.type===g.type&&x.cat!==g.cat){x.cat=g.cat;touched++}});
     }});
-  R.staged.forEach(t=>{delete t.ruled;S.txns.push(t)});
+  // Accounts: remember the name for this file, rename older lumped imports, set where the account goes
+  const map=S.settings.acctMap=S.settings.acctMap||{};let renamed=0;
+  const keyCount={};R.files.forEach(F=>{const k=fileKey(F);keyCount[k]=(keyCount[k]||0)+1});
+  R.files.forEach(F=>{const nm=(F.name||'').trim()||F.bank||'Bank account',k=fileKey(F);
+    // Banks like CommBank name every export the same, so only remember a file name that points to one account
+    if(keyCount[k]===1&&map[k]!=='?')map[k]=map[k]&&map[k]!==nm?'?':nm;else map[k]='?';
+    if(F.orig&&F.orig!==nm){const ids=new Set(F.matched.map(x=>x.id));R.staged.forEach(t=>{if(t.fi===F.fi&&t.dupOf&&!t.keep)ids.add(t.dupOf)});S.txns.forEach(x=>{if(ids.has(x.id)&&x.acct===F.orig){x.acct=nm;renamed++}})}
+    if(SB.user&&BD.list.length){const ja=S.settings.jointAccts=S.settings.jointAccts||{};if(F.dest)ja[nm]=F.dest;else delete ja[nm]}
+    R.staged.forEach(t=>{if(t.fi===F.fi)t.acct=nm})});
+  const take=R.staged.filter(t=>!t.dupOf||t.keep);
+  take.forEach(t=>{['ruled','fi','dupOf','dupNote','dupDate','dupAcct','keep'].forEach(k=>delete t[k]);S.txns.push(t)});
   $('#reviewModal').classList.remove('open');RV=null;
-  const n=R.staged.length;
-  toast(n+' transaction'+(n>1?'s':'')+' imported',[xf?xf+' transfer'+(xf>1?'s':'')+' matched':'',rules?rules+' rule'+(rules>1?'s':'')+' saved':'',touched?touched+' older transaction'+(touched>1?'s':'')+' updated':''].filter(Boolean).join(', ')||'Categories are set, tweak any of them in Transactions','good');
+  const n=take.length;
+  toast(n+' transaction'+(n>1?'s':'')+' imported',[xf?xf+' transfer'+(xf>1?'s':'')+' matched':'',rules?rules+' rule'+(rules>1?'s':'')+' saved':'',touched?touched+' older transaction'+(touched>1?'s':'')+' updated':'',renamed?renamed+' older transaction'+(renamed>1?'s':'')+' moved to the right account':''].filter(Boolean).join(', ')||'Categories are set, tweak any of them in Transactions','good');
   commit();
 }
 $('#reviewModal').addEventListener('change',e=>{const t=e.target;if(!RV)return;
+  if(t.dataset.rvacct!=null){const F=RV.files[+t.dataset.rvacct],nm=t.value.trim().slice(0,40)||F.name;F.name=nm;F.dest=jointOf(nm)||F.dest;RV.staged.forEach(x=>{if(x.fi===F.fi)x.acct=nm});drawReview();return}
+  if(t.dataset.rvdest!=null){RV.files[+t.dataset.rvdest].dest=t.value;drawReview();return}
+  if(t.dataset.rvkeep!=null){const x=RV.staged.find(y=>y.id===t.dataset.rvkeep);if(x)x.keep=t.checked;rvRegroup();return}
   if(t.dataset.rvpair!=null){const p=RV.pairs[+t.dataset.rvpair];p.on=t.checked;RV.pairIds=new Set();RV.pairs.forEach(q=>{if(q.on){RV.pairIds.add(q.out.id);RV.pairIds.add(q.in.id)}});rvRegroup()}
   else if(t.dataset.rvcat!=null){const g=RV.groups[+t.dataset.rvcat],v=t.value;
     if(v==='__transfer'){g.items.forEach(x=>{x.type='transfer';x.cat='Transfer';delete x.ruled});rvRegroup();return}
@@ -2217,33 +2309,83 @@ async function shareSubmit(e){
 }
 
 /* ============ Personal to joint feed ============ */
-/* Entries you mark as shared on your personal board, plus anything imported from a joint bank account,
-   are copied to the joint board. Your personal board is the source: edits and deletes flow across. */
+/* What goes to a joint board is decided in this order: the switch on the entry itself, then its repeating bill or goal,
+   then the joint bank account it came from, then your share rules. Your personal board is the source: edits and deletes flow across. */
 const FEEDK=['txns','items','recurring','goals'];
+const AF={txns:'amount',recurring:'amount',items:'amt'};
 const canShare=()=>!!(SB.user&&!BOARD&&BD.list.length);
+const onBoard=id=>BD.list.some(x=>x.id===id);
 const bName=id=>{const b=BD.list.find(x=>x.id===id);return b?b.name:'joint board'};
 const jointOf=a=>(a&&(S.settings.jointAccts||{})[a])||'';
-function shInherit(t){
-  if(t.rec){const r=(S.recurring||[]).find(x=>x.id===t.rec);if(r&&r.sh)return r.sh}
-  if(t.goal){const g=(S.goals||[]).find(x=>x.id===t.goal);if(g&&g.sh)return g.sh}
-  return jointOf(t.acct);
+const shRules=()=>(S.settings.shareRules||[]).filter(r=>onBoard(r.b)||!BD.list.length);
+/* Does a share rule cover this entry? Category, description and account rules, with an optional minimum amount */
+function ruleHit(r,kind,x){
+  if(kind==='goals')return false;
+  if(kind==='txns'&&(x.type==='transfer'||x.goal))return false;
+  const amt=kind==='items'?(+(x.full!=null?x.full:x.amt)||0):fullAmt(x),desc=kind==='items'?x.name:x.note;
+  if(r.min&&amt<r.min)return false;
+  if(r.f==='cat')return x.cat===r.v;
+  if(r.f==='note'){const v=cleanDesc(r.v);return !!v&&(' '+cleanDesc(desc)+' ').includes(' '+v+' ')}
+  if(r.f==='acct')return kind==='txns'&&x.acct===r.v;
+  return false;
 }
-function shOf(kind,x){if(!x)return '';if(kind!=='txns')return x.sh||'';return x.sh==='-'?'':(x.sh||shInherit(x))}
-function setSh(kind,x,v){v=v||'';if(kind!=='txns'){if(v)x.sh=v;else delete x.sh;return}if(v===shInherit(x))delete x.sh;else x.sh=v||'-'}
-function shareField(id,cur,hint){
+const ruleFor=(kind,x)=>shRules().find(r=>ruleHit(r,kind,x))||null;
+function shSource(kind,x){
+  if(kind==='txns'){
+    if(x.rec){const r=(S.recurring||[]).find(y=>y.id===x.rec);if(r){const b=shOf('recurring',r);if(b)return {b,why:'bill',pct:null}}}
+    if(x.goal){const g=(S.goals||[]).find(y=>y.id===x.goal);if(g&&g.sh)return {b:g.sh,why:'goal',pct:null}}
+    const j=jointOf(x.acct);if(j)return {b:j,why:'acct',pct:x.type==='transfer'?null:+((S.settings.acctSplit||{})[x.acct]||100)};
+  }
+  const r=ruleFor(kind,x);if(r)return {b:r.b,why:'rule',pct:+r.pct||100,rule:r};
+  return null;
+}
+function shInherit(x,kind){const s=shSource(kind||'txns',x);return s?s.b:''}
+function shOf(kind,x){if(!x)return '';if(kind==='goals')return x.sh||'';return x.sh==='-'?'':(x.sh||shInherit(x,kind))}
+function setSh(kind,x,v){v=v||'';if(kind==='goals'){if(v)x.sh=v;else delete x.sh;return}if(v===shInherit(x,kind))delete x.sh;else x.sh=v||'-'}
+/* Splits: the entry keeps your share as its amount (so your personal numbers are right) and the whole bill in full */
+function splitPct(kind,x){if(x.full==null||!+x.full)return 100;return Math.round(+x[AF[kind]]/+x.full*1000)/10}
+function setSplit(kind,x,pct,src){const k=AF[kind],full=x.full!=null?+x.full:+x[k];pct=+pct;
+  if(!(pct>0&&pct<100)){x[k]=full;delete x.full;if(src==='me')x.sp='me';else delete x.sp;return}
+  x.full=full;x[k]=Math.round(full*pct)/100;x.sp=src||'me'}
+function autoPct(kind,x){if(kind==='txns'&&(x.type==='transfer'||x.goal))return 100;const b=shOf(kind,x);if(!b)return 100;const s=shSource(kind,x);if(!s||x.sh&&x.sh!==s.b)return 100;return s.pct||100}
+/* Keep automatic splits in line with your rules and joint account settings. Splits you set by hand are left alone. */
+function applyAutoSplits(){
+  if(BOARD)return 0;let n=0;
+  for(const k of ['txns','recurring','items'])(S[k]||[]).forEach(x=>{if(!isObj(x)||x.sp==='me')return;const want=autoPct(k,x);if(Math.abs(want-splitPct(k,x))>.05){setSplit(k,x,want,'auto');n++}});
+  return n;
+}
+const splitWord=p=>p>=100?'All of it is mine':p===50?'Half each, 50/50':'My share is '+p+'%';
+function shareField(id,cur,hint,kind,x){
   if(!canShare())return '';
-  return `<label class="field shfield">Show on a joint board<select class="inp" id="${id}"><option value="">No, keep it personal</option>${BD.list.map(b=>`<option value="${b.id}" ${cur===b.id?'selected':''}>Yes, on ${esc(b.name)}</option>`).join('')}</select><span class="shhint">${esc(hint||'A linked copy shows on the joint board. Change or delete it here and the copy follows.')}</span></label>`;
+  const src=x?shSource(kind,x):null,auto=src?src.b:'',why=src?{bill:'its repeating bill is shared',goal:'its goal is shared',acct:'it came from a joint account',rule:'one of your share rules covers it'}[src.why]:'';
+  const pct=x?splitPct(kind,x):100,mode=x&&x.sp==='me'?(pct===100?'100':pct===50?'50':'custom'):'auto',ap=x&&src&&src.pct?src.pct:100;
+  const canSplit=kind!=='goals'&&!(x&&kind==='txns'&&(x.type==='transfer'||x.goal));
+  return `<div class="shfield"><label class="field">Show on a joint board<select class="inp" id="${id}" data-shsel="1"><option value="">No, keep it personal</option>${BD.list.map(b=>`<option value="${b.id}" ${cur===b.id?'selected':''}>Yes, on ${esc(b.name)}${b.id===auto?' (automatic)':''}</option>`).join('')}</select></label>
+    <span class="shhint">${esc(auto&&cur===auto&&!(x&&x.sh)?'Shared automatically because '+why+'. Pick No to keep just this one personal.':hint||'A linked copy shows on the joint board. Change or delete it here and the copy follows.')}</span>
+    ${canSplit?`<div class="shsplit" ${cur?'':'hidden'}><label class="field">How is it paid<select class="inp" id="${id}Split" data-shsplit="1">
+      <option value="auto" ${mode==='auto'?'selected':''}>${ap<100?'Use the automatic split ('+ap+'% mine)':'Automatic (all mine unless a rule splits it)'}</option>
+      <option value="100" ${mode==='100'?'selected':''}>All of it is mine</option><option value="50" ${mode==='50'?'selected':''}>Half each, 50/50</option><option value="custom" ${mode==='custom'?'selected':''}>Custom split</option></select></label>
+      <label class="field shpct" ${mode==='custom'?'':'hidden'}>My share %<input class="inp" id="${id}Pct" type="number" min="1" max="99" value="${mode==='custom'?pct:60}"></label>
+      <span class="shhint">Enter the full amount. The joint board shows the full amount and your personal board counts only your share.</span></div>`:''}</div>`;
+}
+/* Read the share and split controls back onto an entry. Returns nothing if the controls are not on screen. */
+function readShare(id,kind,x){
+  const sel=$('#'+id);if(!sel)return;setSh(kind,x,sel.value);
+  const sp=$('#'+id+'Split');if(!sp||!sel.value){if(x.sp==='me'){delete x.sp;if(x.full!=null)setSplit(kind,x,100,'auto')}return}
+  if(sp.value==='auto'){delete x.sp;return}
+  const pct=sp.value==='custom'?Math.min(99,Math.max(1,+$('#'+id+'Pct').value||50)):+sp.value;setSplit(kind,x,pct,'me');
 }
 function shTag(kind,x){
-  if(BOARD)return x.from?' · From '+esc(x.from.n||'a personal board'):'';
-  const b=SB.user&&shOf(kind,x);return b&&BD.list.some(y=>y.id===b)?' · Shared to '+esc(bName(b)):'';
+  if(BOARD)return x.from?' · From '+esc(x.from.n||'a personal board')+(x.split&&x.split<100?', '+esc(x.from.n||'they')+' pays '+x.split+'%':''):'';
+  const b=SB.user&&shOf(kind,x);if(!b||!onBoard(b))return '';const p=kind!=='goals'?splitPct(kind,x):100;
+  return ' · Shared to '+esc(bName(b))+(p<100?', your share '+p+'% of '+money(+x.full,2):'');
 }
 function lockBtn(x){const k=S.txns.includes(x)?'txns':S.items.includes(x)?'items':'recurring';return `<button class="del" style="opacity:1" data-act="lockInfo" data-kind="${k}" data-id="${x.id}" aria-label="Shared from a personal board">${ic('users',14)}</button>`}
 function lockedMsg(x){toast('Shared from '+(x.from.n||'a personal board'),'Change or delete it on their personal board and it updates here','info')}
 function locked(list,id){if(!BOARD)return false;const x=(list||[]).find(y=>y.id===id);if(x&&x.from){lockedMsg(x);return true}return false}
 function goalShareLine(g){
   if(BOARD)return g.from?`<div class="shline">${ic('users',13)}Shared by ${esc(g.from.n||'a personal board')}${g.extra?` · ${money(g.extra)} added here`:''}</div>`:'';
-  if(!canShare())return '';const b=g.sh&&BD.list.some(y=>y.id===g.sh)?g.sh:'';
+  if(!canShare())return '';const b=g.sh&&onBoard(g.sh)?g.sh:'';
   return `<button class="shline lnk" data-act="goalShare" data-id="${g.id}">${ic('users',13)}${b?'Shared to '+esc(bName(b)):'Share to a joint board'}</button>`;
 }
 function goalShare(id){
@@ -2252,9 +2394,21 @@ function goalShare(id){
   toast(nx?'Goal shared to '+bName(nx):'Goal is personal again',nx?'Your partner sees it and can add to it there':'It has been taken off the joint board','good');
 }
 function myName(){const n=(S.settings.myName||'').trim();if(n)return n;const e=((SB.user&&SB.user.email)||'').split('@')[0].replace(/[^a-zA-Z]+.*$/,'');return e?e[0].toUpperCase()+e.slice(1):'Partner'}
+/* Build the copies for one joint board. Splits go across at the full amount. Money moved between your own account
+   and the joint account becomes money in or out on the joint board, since that is what it is from the board's side. */
 function feedFor(b){
   const me={u:SB.user.id,n:myName()},out={};
-  for(const k of FEEDK)out[k]=(S[k]||[]).filter(x=>isObj(x)&&shOf(k,x)===b).map(x=>{const c=JSON.parse(J(x));delete c.sh;c.from=me;return c});
+  for(const k of FEEDK)out[k]=(S[k]||[]).filter(x=>isObj(x)&&shOf(k,x)===b).map(x=>{
+    const c=JSON.parse(J(x));
+    if(c.full!=null&&AF[k]){c.split=Math.round(splitPct(k,x));c[AF[k]]=+c.full}
+    ['sh','full','sp'].forEach(f=>delete c[f]);c.from=me;
+    if(k==='txns'&&c.type==='transfer'&&jointOf(x.acct)===b){
+      const o=x.pair&&S.txns.find(y=>y.id===x.pair),inside=o&&jointOf(o.acct)===b;
+      if(!inside){const into=dirOf(x)==='in',who=o?me.n:'';
+        c.type=into?'income':'expense';c.cat=into?'Other income':'Other';c.xfer=into?'in':'out';
+        c.note=((into?(who?'Paid in by '+who:'Money paid in'):(who?'Taken out by '+who:'Money taken out'))+(x.note?' · '+x.note:'')).slice(0,60);delete c.pair}
+    }
+    return c});
   return out;
 }
 function goalMirror(m,ex){const extra=ex?(+ex.extra||0):0,g=Object.assign({},m,{mine:m.saved,extra,saved:Math.round((m.saved+extra)*100)/100});if(ex&&ex.hit)g.hit=Object.assign({},m.hit||{},ex.hit);return g}
@@ -2267,7 +2421,11 @@ function applyFeed(d,feed,me){
       if(ob&&F.has(x.id)){if(used.has(x.id))continue;used.add(x.id);const m=F.get(x.id);out.push(k==='goals'?goalMirror(m,mine?x:null):m)}
       else if(!mine)out.push(x);
     }
-    for(const m of feed[k])if(!used.has(m.id))out.push(k==='goals'?goalMirror(m,null):m);
+    const others=k==='txns'?out.filter(x=>isObj(x)&&!(x.from&&x.from.u===me)):[];
+    for(const m of feed[k]){if(used.has(m.id))continue;
+      // Already on the board from your partner (they imported the same joint account)? Then leave theirs and skip yours.
+      if(k==='txns'&&m.src==='bank'&&others.some(o=>sameTx(m,o,true)))continue;
+      out.push(k==='goals'?goalMirror(m,null):m)}
     d[k]=out;
   }
   return d;
@@ -2303,17 +2461,41 @@ async function feedJoint(){
   }catch(e){}
   FS.busy=false;if(FS.again){FS.again=false;setTimeout(feedJoint,15000)}
 }
+/* Settings: joint accounts, share rules, your name */
+let RF={f:'cat'};
+const PCTS=[100,50,60,40,70,30];
+const pctSel=(attr,cur)=>`<select class="inp jasel" ${attr}>${[...new Set([...PCTS,+cur||100])].map(p=>`<option value="${p}" ${+cur===p?'selected':''}>${p===100?'All mine':p===50?'50/50':'Mine '+p+'%'}</option>`).join('')}</select>`;
+function ruleText(r){const f={cat:'Category is',note:'Description has',acct:'Account is'}[r.f];return `${f} <b>${esc(r.v)}</b>${r.min?' and '+money(r.min)+' or more':''}`}
 function feedSection(){
   if(!BD.list.length)return '';
-  const accts=[...new Set(S.txns.map(x=>x.acct).filter(Boolean))].sort(),ja=S.settings.jointAccts||{};
+  const accts=[...new Set(S.txns.map(x=>x.acct).filter(Boolean))].sort(),ja=S.settings.jointAccts||{},sp=S.settings.acctSplit||{},rules=S.settings.shareRules||[];
   const n=FEEDK.reduce((a,k)=>a+(S[k]||[]).filter(x=>isObj(x)&&shOf(k,x)).length,0);
+  const opt=b=>BD.list.map(x=>`<option value="${x.id}" ${b===x.id?'selected':''}>${esc(x.name)}</option>`).join('');
+  const valInput=RF.f==='cat'?`<select class="inp" id="rfV">${Object.keys(CATS).filter(c=>c!=='Savings').map(c=>`<option>${esc(c)}</option>`).join('')}</select>`
+    :RF.f==='acct'?`<select class="inp" id="rfV">${accts.length?accts.map(a=>`<option>${esc(a)}</option>`).join(''):'<option value="">No accounts yet</option>'}</select>`
+    :`<input class="inp" id="rfV" maxlength="40" placeholder="e.g. origin energy">`;
   return `<div class="shsec"><div class="eyebrow" style="margin-bottom:4px">Feed your joint board</div>
-    <p class="muted" style="font-size:12.5px;margin-bottom:10px">Anything from a joint bank account goes across automatically. You can also share single transactions, bills, budget items and goals when you add or edit them. ${n?`<b style="color:var(--ink);font-weight:500">${n} ${n===1?'entry is':'entries are'} shared right now.</b>`:''}</p>
-    ${accts.length?accts.map(a=>`<div class="lrow">${catChip({i:'bank',c:ja[a]?'#0e7a5c':'#8d95a2'},30)}<div class="grow"><div class="nm" style="font-size:13px">${esc(a)}</div><div class="sb">${S.txns.filter(x=>x.acct===a).length} imported transactions</div></div><select class="inp jasel" data-ja="${esc(a)}" aria-label="Where ${esc(a)} goes"><option value="">Personal only</option>${BD.list.map(b=>`<option value="${b.id}" ${ja[a]===b.id?'selected':''}>Joint: ${esc(b.name)}</option>`).join('')}</select></div>`).join('')
+    <p class="muted" style="font-size:12.5px;margin-bottom:10px">Joint accounts and share rules send entries across automatically. Anything you set on a single entry wins over these. ${n?`<b style="color:var(--ink);font-weight:500">${n} ${n===1?'entry is':'entries are'} shared right now.</b>`:''}</p>
+    <div class="eyebrow" style="font-size:12px;margin:12px 0 4px">Bank accounts</div>
+    ${accts.length?accts.map(a=>`<div class="lrow jarow">${catChip({i:'bank',c:ja[a]?'#0e7a5c':'#8d95a2'},30)}<div class="grow"><input class="inp janame" data-ren="${esc(a)}" value="${esc(a)}" maxlength="40" aria-label="Account name"><div class="sb">${(n=>n+' transaction'+(n===1?'':'s'))(S.txns.filter(x=>x.acct===a).length)}</div></div>
+      <select class="inp jasel" data-ja="${esc(a)}" aria-label="Where ${esc(a)} goes"><option value="">Personal only</option>${BD.list.map(b=>`<option value="${b.id}" ${ja[a]===b.id?'selected':''}>Joint: ${esc(b.name)}</option>`).join('')}</select>
+      ${ja[a]?pctSel(`data-jas="${esc(a)}" aria-label="Your share of ${esc(a)}"`,sp[a]||100):''}</div>`).join('')
       :'<p class="subtle" style="font-size:12.5px">Import a bank statement on the Transactions page, then pick which accounts are joint here.</p>'}
-    <label class="field" style="margin-top:12px;max-width:260px">Your name on joint boards<input class="inp" id="sMyName" maxlength="24" value="${esc(S.settings.myName||'')}" placeholder="${esc(myName())}"></label>
+    <div class="eyebrow" style="font-size:12px;margin:16px 0 4px">Share rules</div>
+    ${rules.length?rules.map(r=>`<div class="lrow">${catChip({i:'repeat',c:'#3f63a8'},30)}<div class="grow"><div class="nm" style="font-size:13px;white-space:normal">${ruleText(r)}</div><div class="sb">Goes to ${esc(bName(r.b))} · ${splitWord(+r.pct||100)}</div></div><button class="del" style="opacity:1" data-act="ruleDel" data-id="${r.id}" aria-label="Delete rule">${ic('trash',14)}</button></div>`).join(''):'<p class="subtle" style="font-size:12.5px">No rules yet. Example: Category is Groceries goes to the joint board, 50/50.</p>'}
+    <form id="shRuleForm" class="rform">
+      <select class="inp" id="rfF" aria-label="Rule type"><option value="cat" ${RF.f==='cat'?'selected':''}>Category is</option><option value="note" ${RF.f==='note'?'selected':''}>Description has</option><option value="acct" ${RF.f==='acct'?'selected':''}>Account is</option></select>
+      ${valInput}
+      <input class="inp" id="rfMin" type="number" min="0" placeholder="Min $ (optional)" aria-label="Minimum amount">
+      <select class="inp" id="rfB" aria-label="Joint board">${opt('')}</select>
+      ${pctSel('id="rfP" aria-label="Your share"',50)}
+      <button class="btn sec" type="submit">${ic('plus',15,2)}Add rule</button>
+    </form>
+    <p class="subtle" style="font-size:12px;margin-top:6px">Rules cover transactions, bills and budget items. Transfers and goal savings are never caught by rules.</p>
+    <label class="field" style="margin-top:14px;max-width:260px">Your name on joint boards<input class="inp" id="sMyName" maxlength="24" value="${esc(S.settings.myName||'')}" placeholder="${esc(myName())}"></label>
   </div>`;
 }
+function feedChanged(msg,sub){const n=applyAutoSplits();save();refreshShareCard();toast(msg,sub+(n?'. '+n+' split'+(n===1?'':'s')+' updated':''),'good')}
 
 /* ============ Events ============ */
 document.addEventListener('click',e=>{
@@ -2348,6 +2530,7 @@ document.addEventListener('click',e=>{
   if(a==='txEdit'){if(locked(S.txns,el.dataset.id))return;openModal('edit',el.dataset.id);return}
   if(a==='lockInfo'){const k=el.dataset.kind,x=(S[k]||[]).find(y=>y.id===el.dataset.id);if(x)lockedMsg(x);return}
   if(a==='goalShare'){goalShare(el.dataset.id);return}
+  if(a==='ruleDel'){S.settings.shareRules=(S.settings.shareRules||[]).filter(r=>r.id!==el.dataset.id);feedChanged('Rule removed','Entries it covered are personal again unless something else shares them');return}
   if(a==='alertsOn'){if(!('Notification' in window))return;Notification.requestPermission().then(async p=>{S.settings.phoneAlerts=p==='granted';save();
     if(p!=='granted'){$('#remindCard').innerHTML=remindCard();toast('Alerts not allowed','You can change this in your browser settings','warn');return}
     const closed=await pushSubscribe();$('#remindCard').innerHTML=remindCard();
@@ -2406,8 +2589,15 @@ document.addEventListener('change',e=>{const t=e.target;
   if(t.id==='fc'){F.cat=t.value;renderTxList()}
   else if(t.id==='pcut'){P.cut=t.value;renderCut()}
   else if(t.id==='sCur'){S.settings.currency=t.value;save();render()}
-  else if(t.dataset.ja!=null){const ja=S.settings.jointAccts=S.settings.jointAccts||{},a=t.dataset.ja;if(t.value)ja[a]=t.value;else delete ja[a];save();refreshShareCard();
-    const n=S.txns.filter(x=>x.acct===a&&shOf('txns',x)).length;toast(t.value?a+' now feeds '+bName(t.value):a+' is personal only',t.value?n+' transaction'+(n===1?'':'s')+' will show on the joint board, plus new imports':'Its transactions come off the joint board','good')}
+  else if(t.dataset.ja!=null){const ja=S.settings.jointAccts=S.settings.jointAccts||{},a=t.dataset.ja;if(t.value)ja[a]=t.value;else delete ja[a];
+    const n=S.txns.filter(x=>x.acct===a&&shOf('txns',x)).length;feedChanged(t.value?a+' now feeds '+bName(t.value):a+' is personal only',t.value?n+' transaction'+(n===1?'':'s')+' will show on the joint board, plus new imports':'Its transactions come off the joint board')}
+  else if(t.dataset.jas!=null){const sp=S.settings.acctSplit=S.settings.acctSplit||{};if(+t.value>=100)delete sp[t.dataset.jas];else sp[t.dataset.jas]=+t.value;feedChanged('Split saved',t.dataset.jas+': '+splitWord(+t.value))}
+  else if(t.dataset.ren!=null){const o=t.dataset.ren,nm=t.value.trim().slice(0,40);if(!nm||nm===o){t.value=o;return}let n=0;S.txns.forEach(x=>{if(x.acct===o){x.acct=nm;n++}});
+    ['jointAccts','acctSplit'].forEach(k=>{const m=S.settings[k];if(m&&m[o]!=null){m[nm]=m[o];delete m[o]}});(S.settings.shareRules||[]).forEach(r=>{if(r.f==='acct'&&r.v===o)r.v=nm});
+    const am=S.settings.acctMap||{};Object.keys(am).forEach(k=>{if(am[k]===o)am[k]=nm});feedChanged('Account renamed',n+' transaction'+(n===1?'':'s')+' moved to '+nm)}
+  else if(t.id==='rfF'){RF.f=t.value;refreshShareCard()}
+  else if(t.dataset.shsel){const w=t.closest('.shfield'),b=w&&w.querySelector('.shsplit');if(b)b.hidden=!t.value}
+  else if(t.dataset.shsplit){const w=t.closest('.shsplit'),b=w&&w.querySelector('.shpct');if(b)b.hidden=t.value!=='custom'}
   else if(t.id==='sMyName'){S.settings.myName=t.value.trim().slice(0,24);save();toast('Name saved','Shared entries show as from '+myName(),'good')}
   else if(t.id==='sRemind'){S.settings.remind=+t.value;checkBills(true);save();toast(+t.value?'Bill reminders on':'Bill reminders off',+t.value?'You will be reminded '+t.selectedOptions[0].text.toLowerCase():'Turn them back on any time here','info')}
   else if(t.id==='bankFile'&&t.files.length){const fs=[...t.files];t.value='';importBankFiles(fs)}
@@ -2415,9 +2605,13 @@ document.addEventListener('change',e=>{const t=e.target;
 });
 document.addEventListener('submit',e=>{
   if(/^bd/.test(e.target.id)){shareSubmit(e);return}
+  if(e.target.id==='shRuleForm'){e.preventDefault();const v=(($('#rfV')||{}).value||'').trim();if(!v){toast('Add what the rule should match','','bad');return}
+    const r={id:uid(),f:RF.f,v,min:Math.max(0,+$('#rfMin').value||0),b:$('#rfB').value,pct:+$('#rfP').value||100};(S.settings.shareRules=S.settings.shareRules||[]).push(r);
+    const n=FEEDK.reduce((a,k)=>a+(S[k]||[]).filter(x=>isObj(x)&&!x.sh&&ruleHit(r,k,x)).length,0);
+    feedChanged('Rule added',n+' existing entr'+(n===1?'y':'ies')+' now go to '+bName(r.b));return}
   if(e.target.id==='authForm'){e.preventDefault();authSubmit();return}
   if(e.target.id==='itemForm'){e.preventDefault();const name=$('#iName').value.trim(),cat=$('#iCat').value,amt=parseAmt($('#iAmt').value);if(!name||!(amt>0)){$('#iAmt').focus();return}
-    const ex=IM.id&&S.items.find(x=>x.id===IM.id),shE=$('#iShare');let tgt=ex;if(ex){if(ex.name!==name||ex.cat!==cat)ex.key=null;Object.assign(ex,{name,cat,amt,freq:IM.f})}else{tgt={id:uid(),key:null,cat,name,amt,freq:IM.f};S.items.push(tgt)}if(shE)setSh('items',tgt,shE.value);
+    const ex=IM.id&&S.items.find(x=>x.id===IM.id),shE=$('#iShare');let tgt=ex;if(ex){if(ex.name!==name||ex.cat!==cat)ex.key=null;Object.assign(ex,{name,cat,amt,freq:IM.f});delete ex.full}else{tgt={id:uid(),key:null,cat,name,amt,freq:IM.f};S.items.push(tgt)}if(shE)readShare('iShare','items',tgt);
     $('#itemModal').classList.remove('open');if(cat!=='Income')OPEN.add(cat);commit();toast('Budget item saved',name+': '+money(amt*FREQ[IM.f][1],2)+' a week','good');return}
   if(e.target.id!=='goalForm')return;e.preventDefault();
   const on=document.querySelector('#gIcon .on'),g={id:uid(),name:$('#gName').value.trim(),target:parseFloat($('#gTarget').value),saved:parseFloat($('#gSaved').value)||0,icon:on?on.dataset.i:'flag',color:GOAL_COLS[S.goals.length%GOAL_COLS.length],hit:{}};
