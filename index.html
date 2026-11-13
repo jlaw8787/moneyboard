@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Moneyboard</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0d1117">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Moneyboard">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -388,6 +395,20 @@ select.inp{padding-right:30px;appearance:none;background-image:url("data:image/s
 @keyframes fu{0%{opacity:0;transform:translate(-50%,4px)}15%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-36px)}}
 .fab,.bnav,.msheet{display:none}
 .table tbody tr.clk td{cursor:pointer}
+.banner{display:flex;align-items:center;gap:14px;padding:14px 16px;margin-bottom:16px;border-radius:14px;background:var(--warn-soft);border:1px solid #f1dfbd;color:#8a5a12;flex-wrap:wrap}
+.banner b{display:block;color:var(--ink);font-weight:600;font-size:13.5px}
+.banner small{font-size:12.5px}
+.banner .grow{flex:1;min-width:200px}
+.syncbtn{width:100%;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;color:var(--muted);font-weight:500;font-size:13px;margin-top:4px}
+.syncbtn:hover{background:var(--hover);color:var(--ink)}
+.syncbtn .sd{width:7px;height:7px;border-radius:50%;background:var(--subtle);margin-left:auto;flex:none}
+.syncbtn .sd.synced{background:var(--accent)}.syncbtn .sd.syncing,.syncbtn .sd.pending{background:var(--gold)}.syncbtn .sd.error{background:var(--neg)}
+.autherr{font-size:12.5px;color:var(--neg);min-height:18px;margin-top:2px}
+.authok{font-size:12.5px;color:var(--accent-2);background:var(--accent-soft);border-radius:10px;padding:10px 12px}
+.choice{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;width:100%;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.choice:hover{border-color:var(--accent);background:var(--accent-soft)}
+.choice b{color:var(--ink);font-weight:600}
+.choice small{color:var(--muted);font-size:12.5px}
 .recnote{font-size:12.5px;color:var(--muted);background:#f5f6f8;border-radius:10px;padding:10px 12px;margin-top:14px}
 
 @media (max-width:1180px){.c4{grid-template-columns:repeat(2,minmax(0,1fr))}.hero{grid-template-columns:1fr}.hero .hm{border-right:0;border-bottom:1px solid var(--line2)}.brow{grid-template-columns:minmax(130px,1.3fr) minmax(100px,2fr) 90px 110px 90px}.brow .st{display:none}}
@@ -424,6 +445,7 @@ select.inp{padding-right:30px;appearance:none;background-image:url("data:image/s
     <nav class="nav" id="nav"></nav>
     <div class="foot">
       <div class="nav" id="navSettings"></div>
+      <button class="syncbtn" id="syncBtn" data-act="account"></button>
       <div class="lvcard" id="lvcard"></div>
     </div>
   </aside>
@@ -455,6 +477,7 @@ select.inp{padding-right:30px;appearance:none;background-image:url("data:image/s
       <div class="segc" id="typeSeg" style="width:100%">
         <button type="button" data-type="expense" class="on" style="flex:1">Expense</button>
         <button type="button" data-type="income" style="flex:1">Income</button>
+        <button type="button" data-type="transfer" style="flex:1">Transfer</button>
       </div>
       <div class="amtwrap"><span id="curSym">$</span><input id="fAmount" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="0.00" required></div>
       <div class="catpick" id="fCats"></div>
@@ -464,6 +487,7 @@ select.inp{padding-right:30px;appearance:none;background-image:url("data:image/s
       </div>
       <label class="field" id="fRepRow" style="margin-top:12px">Repeats<select class="inp" id="fRepeat"><option value="none">Does not repeat</option><option value="weekly">Every week</option><option value="fortnightly">Every fortnight</option><option value="monthly">Every month</option><option value="quarterly">Every quarter</option><option value="yearly">Every year</option></select></label>
       <div class="recnote" id="fInfo" style="display:none"></div>
+      <div class="recnote" id="fRuleRow" style="display:none"><label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-weight:500;cursor:pointer"><input type="checkbox" id="fRuleOn" style="accent-color:var(--accent);width:16px;height:16px">Remember this for future imports</label><div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap"><span>Match notes containing</span><input class="inp" id="fRuleKey" maxlength="40" style="height:30px;flex:1;min-width:120px;font-size:13px"></div></div>
       <div class="row2" style="margin-top:20px">
         <button type="button" class="btn sec" data-act="closeModal">Cancel</button>
         <button type="submit" class="btn pri" id="fSave">Save</button>
@@ -478,8 +502,10 @@ select.inp{padding-right:30px;appearance:none;background-image:url("data:image/s
   <h2 id="wTitle" style="font-size:22px;letter-spacing:-.02em">Welcome to Moneyboard</h2>
   <p class="muted" style="font-size:13.5px;margin:8px 0 22px">Start with a blank slate and build your own budget, or look around with sample data first. You can switch any time in Settings.</p>
   <div style="display:flex;flex-direction:column;gap:8px"><button class="btn pri" data-act="welcomeFresh">Start fresh</button><button class="btn sec" data-act="welcomeDemo">Explore with sample data</button></div>
-  <p class="subtle" style="font-size:12px;margin-top:16px">Your data stays in this browser. Nothing is sent anywhere.</p>
+  <button class="lnk" data-act="welcomeSignIn" style="margin-top:14px">Already have an account? Sign in</button>
+  <p class="subtle" style="font-size:12px;margin-top:10px">Without an account, your data stays in this browser only.</p>
 </div></div>
+<div class="modal" id="authModal" role="dialog" aria-modal="true" aria-label="Account"><div class="box" id="authBox" style="max-width:400px"></div></div>
 <div class="modal" id="ach" role="dialog" aria-modal="true" aria-label="Achievement"><div class="box achbox" id="achBox"></div></div>
 <div class="modal" id="wiz" role="dialog" aria-modal="true" aria-label="Budget setup"><div class="box wbox" id="wizBox"></div></div>
 <div class="modal" id="itemModal" role="dialog" aria-modal="true" aria-label="Budget item"><div class="box" id="itemBox"></div></div>
@@ -544,6 +570,7 @@ const ICONS = {
   card:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h3"/>',
   paw:'<circle cx="5.5" cy="10" r="1.8"/><circle cx="9" cy="6" r="1.8"/><circle cx="15" cy="6" r="1.8"/><circle cx="18.5" cy="10" r="1.8"/><path d="M12 11c-3 0-5.5 4-5.5 6.5 0 1.6 1.4 2.5 3 2.5 1 0 1.6-.5 2.5-.5s1.5.5 2.5.5c1.6 0 3-.9 3-2.5C17.5 15 15 11 12 11z"/>',
   edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+  cloud:'<path d="M7 18.5a4.5 4.5 0 0 1-.6-9A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9.5z"/>',
   more:'<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>'
 };
 const ic = (n,s=18,w=1.75) => '<svg class="i" width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+w+'" stroke-linecap="round" stroke-linejoin="round">'+(ICONS[n]||ICONS.box)+'</svg>';
@@ -671,16 +698,21 @@ function dLabel(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,
 function money(v,dec=0){try{return new Intl.NumberFormat('en-AU',{style:'currency',currency:S.settings.currency,maximumFractionDigits:dec,minimumFractionDigits:dec}).format(v)}catch(e){return '$'+Number(v).toFixed(dec)}}
 function short(v){try{return new Intl.NumberFormat('en-AU',{style:'currency',currency:S.settings.currency,notation:'compact',maximumFractionDigits:1}).format(v)}catch(e){return '$'+Math.round(v)}}
 function curSymbol(){return money(0).replace(/[\d.,\s]/g,'')||'$'}
-const catInfo = t => (t.type==='income'?INCATS[t.cat]:CATS[t.cat]) || CATS.Other;
+const XFER = {i:'swap',c:'#69707d'};
+const catInfo = t => t.type==='transfer'?XFER:(t.type==='income'?INCATS[t.cat]:CATS[t.cat]) || CATS.Other;
 const catChip = (inf,s=32) => '<span class="cat" style="width:'+s+'px;height:'+s+'px;background:'+inf.c+'14;color:'+inf.c+'">'+ic(inf.i,s>30?16:14)+'</span>';
 
 /* ============ State ============ */
-function fresh(){return {txns:[],items:[],recurring:[],period:'week',goals:[],xp:0,unlocked:{},notifs:[],alerted:{},flags:{},settings:{currency:'AUD'},view:'dashboard',month:curYM()}}
+function fresh(){return {txns:[],items:[],recurring:[],rules:[],period:'week',goals:[],xp:0,unlocked:{},notifs:[],alerted:{},flags:{},settings:{currency:'AUD'},view:'dashboard',month:curYM()}}
 function load(){try{const s=localStorage.getItem(KEY);return s?JSON.parse(s):null}catch(e){return null}}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+const sig = () => JSON.stringify(S,(k,v)=>k==='view'||k==='month'||k==='savedAt'||k==='syncAt'||k==='syncUid'?undefined:v);
+let lastSig='';
+function store(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(silent){const j=sig();if(j!==lastSig){lastSig=j;if(!silent){S.savedAt=Date.now();schedulePush()}}store()}
 let S = load(), firstRun=false;
 if(!S){S=fresh();firstRun=true}
 S = Object.assign(fresh(),S);
+lastSig=sig();if(!S.flags.since)S.flags.since=Date.now();
 
 function seed(){
   const now=new Date(), rnd=(a,b)=>Math.round(a+Math.random()*(b-a)), pick=a=>a[Math.floor(Math.random()*a.length)];
@@ -741,10 +773,10 @@ function seed(){
 /* ============ Calculations ============ */
 function monthTx(ym){return S.txns.filter(t=>t.date.slice(0,7)===ym)}
 const isSave = c => (CATS[c]||{}).k==='save';
-function totals(ym){let inc=0,exp=0,sav=0;const byCat={};for(const t of monthTx(ym)){if(t.type==='income')inc+=t.amount;else{byCat[t.cat]=(byCat[t.cat]||0)+t.amount;if(isSave(t.cat))sav+=t.amount;else exp+=t.amount}}return {inc,exp,sav,net:inc-exp,rate:inc?(inc-exp)/inc:0,byCat}}
-const manual = () => S.txns.filter(t=>!t.auto);
+function totals(ym){let inc=0,exp=0,sav=0;const byCat={};for(const t of monthTx(ym)){if(t.type==='income')inc+=t.amount;else if(t.type==='expense'){byCat[t.cat]=(byCat[t.cat]||0)+t.amount;if(isSave(t.cat))sav+=t.amount;else exp+=t.amount}}return {inc,exp,sav,net:inc-exp,rate:inc?(inc-exp)/inc:0,byCat}}
+const manual = () => S.txns.filter(t=>!t.auto&&t.src!=='bank');
 function streak(){const days=new Set(manual().map(t=>t.date));const d=new Date();if(!days.has(iso(d)))d.setDate(d.getDate()-1);let n=0;while(days.has(iso(d))){n++;d.setDate(d.getDate()-1)}return n}
-function daysLogged(ym){return new Set(monthTx(ym).filter(t=>!t.auto).map(t=>t.date)).size}
+function daysLogged(ym){return new Set(monthTx(ym).filter(t=>!t.auto&&t.src!=='bank').map(t=>t.date)).size}
 const weekly = it => (+it.amt||0)*((FREQ[it.freq]||FREQ.monthly)[1]);
 function budgetsW(){const o={};S.items.forEach(it=>{if(it.cat!=='Income')o[it.cat]=(o[it.cat]||0)+weekly(it)});return o}
 function BM(){const o={},w=budgetsW();for(const c in w)o[c]=w[c]*52/12;return o}
@@ -797,6 +829,12 @@ function delTx(id){
   if(t.goal){const g=S.goals.find(x=>x.id===t.goal);if(g)g.saved=Math.max(0,Math.round((g.saved-t.amount)*100)/100)}
   S.txns=S.txns.filter(x=>x.id!==id);return t;
 }
+
+/* ============ Category rules ============ */
+const normNote = s => String(s||'').toLowerCase().replace(/[^a-z ]+/g,' ').replace(/\s+/g,' ').trim();
+function suggestKey(note){const w=normNote(note).split(' ').filter(x=>x.length>1);if(!w.length)return '';let k=w[0];if(k.length<=3&&w[1])k+=' '+w[1];return k}
+const matchKey = (note,key) => !!key&&(' '+normNote(note)+' ').includes(' '+key+' ');
+function findRule(note){let best=null;(S.rules||[]).forEach(r=>{if(matchKey(note,r.match)&&(!best||r.match.length>best.match.length))best=r});return best}
 
 /* ============ Challenges ============ */
 const CHALLENGES = [
@@ -911,7 +949,7 @@ V.dashboard=()=>{
   const H=health(ym),sc=H.score,scCol=sc>=70?'var(--accent)':sc>=50?'var(--gold)':'var(--neg)',scWord=sc>=85?'Excellent':sc>=70?'Strong':sc>=50?'Fair':'Needs attention';
   const N=daysIn(ym),isCur=ym===curYM(),lastDay=isCur?new Date().getDate():(ym<curYM()?N:0);
   const daily=Array(N).fill(0),dailyNet=Array(N).fill(0);
-  monthTx(ym).forEach(x=>{const i=+x.date.slice(8)-1;if(x.type==='expense'&&isSave(x.cat))return;if(x.type==='expense'){daily[i]+=x.amount;dailyNet[i]-=x.amount}else dailyNet[i]+=x.amount});
+  monthTx(ym).forEach(x=>{const i=+x.date.slice(8)-1;if(x.type==='transfer'||(x.type==='expense'&&isSave(x.cat)))return;if(x.type==='expense'){daily[i]+=x.amount;dailyNet[i]-=x.amount}else dailyNet[i]+=x.amount});
   let cum=0;const cumA=daily.map(v=>cum+=v);let cn=0;const cumN=dailyNet.map(v=>cn+=v);
 
   // sparkline (cumulative net)
@@ -967,6 +1005,7 @@ V.dashboard=()=>{
     <div class="missions"><div class="mt"><b>Daily missions</b>${dn} of 3 done${dn===3?' · perfect day':''}</div>${MISSIONS.map(m=>`<button class="mis ${D.done[m.id]?'done':''}" data-act="mission" data-id="${m.id}"><span class="ck">${D.done[m.id]?ic('check',13,2.6):''}</span><span class="tx">${m.t}</span><span class="px">+${m.xp}</span></button>`).join('')}</div>
   </div>`;
   return `
+  ${backupBanner()}
   ${player}
   <div class="card hero" style="margin-bottom:16px">
     <div class="hm">
@@ -1035,7 +1074,7 @@ V.dashboard=()=>{
 };
 
 function txTable(list,del){
-  return `<table class="table"><thead><tr><th>Description</th><th class="hm">Category</th><th class="hm">Date</th><th class="r">Amount</th>${del?'<th style="width:36px"></th>':''}</tr></thead><tbody>${list.map(t=>{const ci=catInfo(t),inc=t.type==='income';return `<tr class="clk" data-act="txEdit" data-id="${t.id}"><td><div class="desc">${catChip(ci)}<div><b>${esc(t.note||t.cat)}</b><div class="muted" style="font-size:12px">${t.goal?'Saved to goal':t.auto?'Repeating':inc?'Income':'Expense'}</div></div></div></td><td class="hm"><span class="pill nt">${esc(t.cat)}</span></td><td class="hm muted">${dLabel(t.date)}</td><td class="r"><span class="amt ${inc?'in':''}">${inc?'+':'-'}${money(t.amount,2)}</span></td>${del?`<td class="r"><button class="del" data-act="delTx" data-id="${t.id}" aria-label="Delete">${ic('trash',15)}</button></td>`:''}</tr>`}).join('')}</tbody></table>`;
+  return `<table class="table"><thead><tr><th>Description</th><th class="hm">Category</th><th class="hm">Date</th><th class="r">Amount</th>${del?'<th style="width:36px"></th>':''}</tr></thead><tbody>${list.map(t=>{const ci=catInfo(t),inc=t.type==='income';const xf=t.type==='transfer';return `<tr class="clk" data-act="txEdit" data-id="${t.id}"><td><div class="desc">${catChip(ci)}<div><b>${esc(t.note||t.cat)}</b><div class="muted" style="font-size:12px">${t.goal?'Saved to goal':xf?'Transfer':t.auto?'Repeating':inc?'Income':'Expense'}</div></div></div></td><td class="hm"><span class="pill nt">${esc(t.cat)}</span></td><td class="hm muted">${dLabel(t.date)}</td><td class="r"><span class="amt ${inc?'in':''}" ${xf?'style="color:var(--muted)"':''}>${xf?'':inc?'+':'-'}${money(t.amount,2)}</span></td>${del?`<td class="r"><button class="del" data-act="delTx" data-id="${t.id}" aria-label="Delete">${ic('trash',15)}</button></td>`:''}</tr>`}).join('')}</tbody></table>`;
 }
 
 let F={q:'',type:'all',cat:'all'};
@@ -1043,7 +1082,7 @@ V.transactions=()=>`
   <div class="card">
     <div class="toolbar">
       <label class="search">${ic('search',16)}<input id="fq" placeholder="Search transactions" value="${esc(F.q)}"></label>
-      <div class="segc" id="ftype">${[['all','All'],['expense','Expenses'],['income','Income']].map(([k,l])=>`<button data-ft="${k}" class="${F.type===k?'on':''}">${l}</button>`).join('')}</div>
+      <div class="segc" id="ftype">${[['all','All'],['expense','Expenses'],['income','Income'],['transfer','Transfers']].map(([k,l])=>`<button data-ft="${k}" class="${F.type===k?'on':''}">${l}</button>`).join('')}</div>
       <select class="inp" id="fc"><option value="all">All categories</option>${[...Object.keys(CATS),...Object.keys(INCATS)].map(c=>`<option value="${esc(c)}" ${F.cat===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
       <label class="btn sec" style="cursor:pointer">${ic('upload',16)}Import bank CSV<input type="file" accept=".csv,text/csv" id="bankFile" hidden></label>
     </div>
@@ -1053,7 +1092,7 @@ V.transactions=()=>`
 function recCard(){
   const R=[...(S.recurring||[])].sort((a,b)=>a.next.localeCompare(b.next)),FL={weekly:'week',fortnightly:'fortnight',monthly:'month',quarterly:'quarter',yearly:'year'};
   return `<div class="card" style="margin-top:16px"><div class="ch"><div><h3>Recurring</h3><div class="s" style="margin-top:2px">Logged for you on each due date</div></div><button class="btn sec sm" data-act="recNew">${ic('plus',14,2)}Add repeating item</button></div>
-  ${R.length?R.map(r=>{const ci=r.type==='income'?(INCATS[r.cat]||INCATS['Other income']):(CATS[r.cat]||CATS.Other);return `<div class="lrow">${catChip(ci)}<div class="grow"><div class="nm">${esc(r.note||r.cat)}</div><div class="sb">Every ${FL[r.freq]} · next on ${dLabel(r.next)}</div></div><span class="amt ${r.type==='income'?'in':''}">${r.type==='income'?'+':'-'}${money(r.amount,2)}</span><button class="del" style="opacity:1" data-act="recEdit" data-id="${r.id}" aria-label="Edit">${ic('edit',14)}</button><button class="del" style="opacity:1" data-act="recDel" data-id="${r.id}" aria-label="Stop repeating">${ic('trash',14)}</button></div>`}).join(''):empty('repeat','Nothing repeating yet. Choose how often it repeats when you add rent, pay or a subscription.')}
+  ${R.length?R.map(r=>{const ci=r.type==='transfer'?XFER:r.type==='income'?(INCATS[r.cat]||INCATS['Other income']):(CATS[r.cat]||CATS.Other);return `<div class="lrow">${catChip(ci)}<div class="grow"><div class="nm">${esc(r.note||r.cat)}</div><div class="sb">Every ${FL[r.freq]} · next on ${dLabel(r.next)}</div></div><span class="amt ${r.type==='income'?'in':''}">${r.type==='income'?'+':r.type==='transfer'?'':'-'}${money(r.amount,2)}</span><button class="del" style="opacity:1" data-act="recEdit" data-id="${r.id}" aria-label="Edit">${ic('edit',14)}</button><button class="del" style="opacity:1" data-act="recDel" data-id="${r.id}" aria-label="Stop repeating">${ic('trash',14)}</button></div>`}).join(''):empty('repeat','Nothing repeating yet. Choose how often it repeats when you add rent, pay or a subscription.')}
   </div>`;
 }
 function renderTxList(){
@@ -1192,24 +1231,30 @@ function renderCut(){
 
 V.settings=()=>`
   <div class="grid c2">
+    <div class="card" id="acctCard">${acctCard()}</div>
     <div class="card"><div class="ch"><h3>Preferences</h3></div>
       <label class="field" style="max-width:260px">Currency<select class="inp" id="sCur">${['AUD','NZD','USD','GBP','EUR','CAD'].map(c=>`<option ${S.settings.currency===c?'selected':''}>${c}</option>`).join('')}</select></label>
-      <p class="muted" style="margin-top:16px;font-size:13px">Your data is stored in this browser only and never leaves your device. Export a backup from time to time.</p>
+      <p class="muted" style="margin-top:16px;font-size:13px">${SB.user?'Your data is saved in this browser and synced to your account.':'Your data is stored in this browser only. Sign in to sync it, or export a backup from time to time.'}</p>
     </div>
     <div class="card"><div class="ch"><h3>Backup and restore</h3></div>
+      <p class="muted" style="font-size:13px;margin-bottom:14px">Last backup: <b style="color:var(--ink);font-weight:500">${S.flags.backupAt?dLabel(iso(new Date(S.flags.backupAt))):'never'}</b>. A backup is a file you can keep anywhere and import later.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" data-act="export">${ic('download',16)}Export backup</button><label class="btn sec" style="cursor:pointer">${ic('upload',16)}Import backup<input type="file" accept=".json,application/json" id="importFile" hidden></label></div>
       <textarea class="inp" id="exportBox" style="width:100%;height:110px;margin-top:12px;display:none;font-family:ui-monospace,monospace;font-size:11px;padding:10px" readonly></textarea>
     </div>
     <div class="card"><div class="ch"><h3>Data</h3></div>
-      <p class="muted" style="font-size:13px;margin-bottom:14px">Sample data is loaded on first run so you can see how everything works. Clear it when you are ready to track your own money.</p>
+      <p class="muted" style="font-size:13px;margin-bottom:14px">Load sample data to see how everything works, or clear everything and start again.${SB.user?' Clearing also clears the data in your account.':''}</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" data-act="demo">${ic('refresh',16)}Reload sample data</button><button class="btn dng" data-act="clear">${ic('trash',16)}<span>Clear all data</span></button></div>
     </div>
     <div class="card"><div class="ch"><h3>Import from your bank</h3></div>
       <p class="muted" style="font-size:13px;margin-bottom:14px">Download a CSV statement from your internet banking (most Australian banks offer this under Statements or Export), then import it here. Categories are guessed from the description and duplicates are skipped.</p>
       <label class="btn sec" style="cursor:pointer">${ic('upload',16)}Import bank CSV<input type="file" accept=".csv,text/csv" id="bankFile" hidden></label>
     </div>
+    <div class="card"><div class="ch"><h3>Category rules</h3><span class="s">${(S.rules||[]).length} saved</span></div>
+      ${(S.rules||[]).length?`<div style="max-height:240px;overflow:auto">${S.rules.map(r=>`<div class="lrow">${catChip(r.type==='transfer'?XFER:r.type==='income'?(INCATS[r.cat]||INCATS['Other income']):(CATS[r.cat]||CATS.Other),28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(r.match)}</div><div class="sb">Goes to ${esc(r.cat)}</div></div><button class="del" style="opacity:1" data-act="ruleDel" data-id="${r.id}" aria-label="Delete rule">${ic('trash',14)}</button></div>`).join('')}</div>`:'<p class="muted" style="font-size:13px">No rules yet. Open an imported transaction, fix its category and tick Remember. Future imports then sort it for you.</p>'}
+    </div>
+    <div class="card"><div class="ch"><h3>Install on your phone</h3></div>${installCard()}</div>
     <div class="card"><div class="ch"><h3>How progress works</h3></div>
-      <p class="muted" style="font-size:13px">Each transaction you log earns 5 XP and badges pay larger rewards. Every ${LEVEL_XP} XP takes you up a level. Repeating transactions are logged for you and do not count toward your streak. Budget alerts trigger at 80% and 100% of each limit, and goal alerts at 25, 50, 75 and 100%. Press <b style="color:var(--ink)">N</b> anywhere to add a transaction.</p>
+      <p class="muted" style="font-size:13px">Each transaction you log earns 5 XP and badges pay larger rewards. Every ${LEVEL_XP} XP takes you up a level. Repeating transactions and bank imports are added for you, so they do not count toward your streak. Budget alerts trigger at 80% and 100% of each limit, and goal alerts at 25, 50, 75 and 100%. Press <b style="color:var(--ink)">N</b> anywhere to add a transaction.</p>
     </div>
   </div>`;
 
@@ -1270,16 +1315,21 @@ function openModal(mode,id){
   const info=mode==='edit'&&t.goal?'This came from a savings goal. Changing the amount updates the goal too.':mode==='edit'&&t.auto?'Logged automatically from a repeating item. To change future ones, edit it under Recurring on the Transactions page.':mode==='rule'?'Changes apply from the next date onwards. Transactions already logged stay as they are.':'';
   $('#fInfo').textContent=info;$('#fInfo').style.display=info?'':'none';
   $('#fDelWrap').style.display=mode==='new'?'none':'';$('#fDel').textContent=mode==='rule'?'Stop repeating':'Delete transaction';
+  MM.bank=!!(t&&t.src==='bank');const showRule=mode==='edit'&&!!(t.note||'').trim()&&!t.goal;$('#fRuleRow').style.display=showRule?'':'none';$('#fRuleOn').checked=false;
+  if(showRule){const ex=findRule(t.note);$('#fRuleKey').value=ex?ex.match:suggestKey(t.note)}
   drawCats();$('#modal').classList.add('open');setTimeout(()=>$('#fAmount').focus(),50);
 }
 function drawCats(){
   document.querySelectorAll('#typeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.type===fType));
+  $('#fCats').style.display=fType==='transfer'?'none':'';
+  if(fType==='transfer'){fCat='Transfer';$('#fSave').textContent=MM.mode!=='new'?'Save changes':'Add transfer';return}
   const src=fType==='income'?INCATS:CATS;if(!src[fCat])fCat=Object.keys(src)[0];
   $('#fCats').innerHTML=Object.entries(src).map(([c,i])=>`<button type="button" data-cat="${c}" class="${c===fCat?'on':''}">${ic(i.i,18)}${esc(i.s||c)}</button>`).join('');
   $('#fSave').textContent=MM.mode!=='new'?'Save changes':fType==='income'?'Add income':'Add expense';
 }
-$('#typeSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(b){fType=b.dataset.type;drawCats()}});
-$('#fCats').addEventListener('click',e=>{const b=e.target.closest('button');if(b){fCat=b.dataset.cat;drawCats()}});
+$('#typeSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(b){fType=b.dataset.type;drawCats();ruleNudge()}});
+$('#fCats').addEventListener('click',e=>{const b=e.target.closest('button');if(b){fCat=b.dataset.cat;drawCats();ruleNudge()}});
+function ruleNudge(){if(MM.mode==='edit'&&MM.bank&&$('#fRuleRow').style.display!=='none')$('#fRuleOn').checked=true}
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')$('#modal').classList.remove('open')});
 $('#txForm').addEventListener('submit',e=>{
   e.preventDefault();const amt=Math.round(parseFloat($('#fAmount').value)*100)/100;if(!(amt>0))return;
@@ -1287,7 +1337,14 @@ $('#txForm').addEventListener('submit',e=>{
   if(MM.mode==='edit'){
     const t=S.txns.find(x=>x.id===MM.id);if(!t)return;
     if(t.goal){const g=S.goals.find(x=>x.id===t.goal),keep=fType==='expense'&&fCat==='Savings';if(g)g.saved=Math.max(0,Math.round((g.saved+(keep?amt:0)-t.amount)*100)/100);if(!keep)delete t.goal}
-    Object.assign(t,{type:fType,amount:amt,cat:fCat,date,note});$('#modal').classList.remove('open');toast('Transaction updated',money(amt,2)+' · '+t.cat,'good');commit();return;
+    Object.assign(t,{type:fType,amount:amt,cat:fCat,date,note});$('#modal').classList.remove('open');
+    const key=normNote($('#fRuleKey').value);
+    if($('#fRuleRow').style.display!=='none'&&$('#fRuleOn').checked&&key){
+      S.rules=(S.rules||[]).filter(r=>r.match!==key);S.rules.push({id:uid(),match:key,type:fType,cat:fCat});
+      let n=0;S.txns.forEach(x=>{if(x!==t&&x.src==='bank'&&!x.goal&&matchKey(x.note,key)&&(fType==='transfer'||x.type===fType)&&(x.cat!==fCat||x.type!==fType)){x.type=fType;x.cat=fCat;n++}});
+      toast('Saved and remembered','"'+key+'" will go to '+fCat+(n?'. Updated '+n+' other transaction'+(n>1?'s':''):''),'good');
+    } else toast('Transaction updated',money(amt,2)+' · '+t.cat,'good');
+    commit();return;
   }
   if(MM.mode==='rule'){
     const r=S.recurring.find(x=>x.id===MM.id);if(!r)return;
@@ -1390,9 +1447,135 @@ function importBankCSV(text){
     if(!amt||isNaN(amt))continue;const note=(desc>=0?r[desc]:'').trim().replace(/\s+/g,' ').slice(0,60);
     const t={id:uid(),date,type:amt<0?'expense':'income',amount:Math.abs(Math.round(amt*100)/100),note,src:'bank'};
     t.cat=t.type==='income'?(/salary|pay|wage/i.test(note)?'Salary':'Other income'):guessCat(note);
+    if(/internal transfer|own account|to savings|from savings|savings acc|offset acc|transfer to self/i.test(note)){t.type='transfer';t.cat='Transfer'}
+    const rl=findRule(note);if(rl&&(rl.type==='transfer'||rl.type===t.type)){t.type=rl.type;t.cat=rl.cat}
     const k=t.date+'|'+t.amount.toFixed(2)+'|'+note.toLowerCase();if(seen.has(k)){dup++;continue}seen.add(k);S.txns.push(t);added++;
   }
   return {added,dup};
+}
+
+/* ============ Backup reminder and install ============ */
+const DAY=864e5;
+function backupBanner(){
+  if(SB.user||!S.txns.length||(S.flags.snooze||0)>Date.now())return '';
+  const last=S.flags.backupAt||S.flags.since||Date.now(),days=Math.floor((Date.now()-last)/DAY);if(days<14)return '';
+  return `<div class="banner">${ic('save',20)}<div class="grow"><b>Back up your data</b><small>${S.flags.backupAt?'Last backup was '+days+' days ago.':'You have not backed up yet.'} Everything is stored in this browser only, so clearing it would wipe your data.</small></div><button class="btn pri sm" data-act="export">Export backup</button><button class="btn sec sm" data-act="authOpen">Sign in to sync</button><button class="del" style="opacity:1" data-act="snooze" aria-label="Remind me later">${ic('x',14)}</button></div>`;
+}
+let installEvt=null;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;if(S.view==='settings')render(true)});
+addEventListener('appinstalled',()=>{installEvt=null;toast('Moneyboard installed','Open it from your home screen','good')});
+function installCard(){
+  if(matchMedia('(display-mode: standalone)').matches||navigator.standalone)return '<p class="muted" style="font-size:13px">You are using the installed app. Nice.</p>';
+  return `<p class="muted" style="font-size:13px;margin-bottom:14px">Add Moneyboard to your home screen so it opens full screen like a normal app and works offline.</p>
+  ${installEvt?`<button class="btn pri" data-act="install">${ic('download',16)}Install app</button>`:`<div class="muted" style="font-size:13px;line-height:1.7"><b style="color:var(--ink);font-weight:500">iPhone:</b> open this page in Safari, tap Share, then Add to Home Screen.<br><b style="color:var(--ink);font-weight:500">Android:</b> open this page in Chrome, tap the menu, then Install app.</div>`}`;
+}
+
+/* ============ Account and cloud sync (Supabase) ============ */
+const SB_URL='https://oxukchnigtkuzrcxlupi.supabase.co',SB_KEY='sb_publishable_KGHY-dtBWEG-k71oxI5TYg_q8Phu_p2';
+const SB={client:null,user:null,status:'off',busy:false,pushing:false,again:false,timer:null};
+const hasData = d => !!(d&&((d.txns||[]).length||(d.items||[]).length||(d.goals||[]).length));
+function sbLoad(){
+  if(!/^https?:/.test(location.protocol))return;
+  const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';sc.onload=sbInit;sc.onerror=()=>setSync('off');document.head.appendChild(sc);
+}
+function sbInit(){
+  if(!window.supabase)return;
+  SB.client=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  SB.client.auth.onAuthStateChange((ev,session)=>{
+    const u=session?session.user:null;
+    if(ev==='PASSWORD_RECOVERY')setTimeout(()=>authOpen('reset'),0);
+    if(u&&(!SB.user||SB.user.id!==u.id)){SB.user=u;setTimeout(pull,0)}
+    else if(!u&&SB.user){SB.user=null;setSync('off')}
+  });
+  renderSync();
+}
+function setSync(st){SB.status=st;renderSync()}
+function syncLabel(){if(!SB.user)return 'Sign in to sync';return {synced:'Synced',syncing:'Syncing',pending:'Saving',error:'Not synced, will retry',off:'Synced'}[SB.status]||'Synced'}
+function renderSync(){
+  const b=$('#syncBtn');if(b){b.innerHTML=ic('cloud',16)+'<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+syncLabel()+'</span>'+(SB.user?'<span class="sd '+SB.status+'"></span>':'');b.title=SB.user?SB.user.email:'Sign in to back up and sync across devices'}
+  const c=$('#acctCard');if(c)c.innerHTML=acctCard();
+}
+function acctCard(){
+  if(!SB.user)return `<div class="ch"><h3>Account and sync</h3></div><p class="muted" style="font-size:13px;margin-bottom:14px">Optional. Sign in to back up your data to the cloud and use Moneyboard on your phone and computer with the same data.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" data-act="authOpen">${ic('cloud',16)}Sign in</button><button class="btn sec" data-act="authOpen" data-mode="up">Create account</button></div>`;
+  return `<div class="ch"><h3>Account and sync</h3><span class="pill ${SB.status==='error'?'bad':SB.status==='synced'||SB.status==='off'?'ok':'warn'}">${syncLabel()}</span></div><p style="font-size:13px;margin-bottom:4px;color:var(--ink);font-weight:500">${esc(SB.user.email)}</p><p class="muted" style="font-size:12.5px;margin-bottom:14px">${S.syncAt?'Last synced '+new Date(S.syncAt).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'Not synced yet'}. Changes save to your account automatically.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" data-act="syncNow">${ic('refresh',16)}Sync now</button><button class="btn sec" data-act="signOut">Sign out</button></div>`;
+}
+function schedulePush(){if(!SB.user)return;clearTimeout(SB.timer);SB.status!=='syncing'&&setSync('pending');SB.timer=setTimeout(pushNow,1500)}
+async function pushNow(){
+  if(!SB.user||!SB.client)return;clearTimeout(SB.timer);
+  if(SB.pushing){SB.again=true;return}SB.pushing=true;setSync('syncing');
+  try{
+    const at=new Date(Math.max(Date.now(),(S.syncAt||0)+1));S.syncUid=SB.user.id;
+    const {error}=await SB.client.from('boards').upsert({user_id:SB.user.id,data:S,updated_at:at.toISOString()});
+    if(error)throw error;S.syncAt=at.getTime();store();setSync('synced');
+  }catch(e){setSync('error')}
+  SB.pushing=false;if(SB.again||(S.savedAt||0)>(S.syncAt||0)&&SB.status==='synced'){SB.again=false;schedulePush()}
+}
+async function pull(){
+  if(!SB.user||!SB.client||SB.busy)return;SB.busy=true;setSync('syncing');
+  try{
+    const uid=SB.user.id,{data,error}=await SB.client.from('boards').select('data,updated_at').eq('user_id',uid).maybeSingle();
+    if(error)throw error;
+    const linked=S.syncUid===uid,dirty=(S.savedAt||0)>(S.syncAt||0);
+    if(!data){if(S.flags.sample&&!linked){adopt(fresh(),0);toast('Signed in','Your account starts clean. The sample data was cleared.','good')}S.syncUid=uid;SB.busy=false;await pushNow();return}
+    const at=Date.parse(data.updated_at);
+    if(linked){
+      if(at<=(S.syncAt||0)+5){SB.busy=false;if(dirty)await pushNow();else setSync('synced');return}
+      if(!dirty)adopt(data.data,at);else conflict(data.data,at);
+    }else{
+      if(!hasData(S)||S.flags.sample){adopt(data.data,at);toast('Signed in','Your data has been loaded from your account','good')}
+      else if(!hasData(data.data)){S.syncUid=uid;SB.busy=false;await pushNow();toast('Signed in','This device\'s data is now saved to your account','good');return}
+      else conflict(data.data,at);
+    }
+  }catch(e){setSync('error')}
+  SB.busy=false;
+}
+function adopt(d,at){
+  const v=S.view;S=Object.assign(fresh(),d||{});S.view=v||'dashboard';S.syncUid=SB.user?SB.user.id:null;S.syncAt=at;S.savedAt=at;S.flags.welcomed=true;if(!S.flags.since)S.flags.since=Date.now();
+  lastSig=sig();store();$('#welcome').classList.remove('open');
+  const n=runRecurring();recurringNotice(n,true);checkAlerts(true);evalChallenges(true);save();
+  setSync(SB.status==='syncing'&&(S.savedAt||0)<=(S.syncAt||0)?'synced':SB.status);render(true);
+}
+let CONF=null;
+function conflict(d,at){
+  CONF={d,at};setSync('pending');
+  const n=x=>(x.txns||[]).length,cd=new Date(at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
+  $('#authBox').innerHTML=`<div class="mh"><h2>Which data should we keep?</h2></div><p class="muted" style="font-size:13px;margin-bottom:16px">Your account and this device both have data. Pick one to keep. The other will be replaced, so export a backup first if you are unsure.</p>
+  <div style="display:flex;flex-direction:column;gap:8px"><button class="choice" data-act="confCloud"><b>Use my account data</b><small>${n(d)} transactions, last saved ${cd}</small></button><button class="choice" data-act="confLocal"><b>Use this device's data</b><small>${n(S)} transactions on this device</small></button></div>
+  <button class="lnk" data-act="export" style="margin-top:14px">Export a backup of this device first</button>`;
+  $('#authModal').classList.add('open');
+}
+let AM='in';
+function authOpen(mode){
+  if(!SB.client){toast('Sign in is not available right now','Check your internet connection and try again','bad');return}
+  AM=mode||'in';const t={in:'Sign in',up:'Create account',forgot:'Reset password',reset:'Choose a new password'}[AM];
+  const email=AM!=='reset'?`<label class="field">Email<input class="inp" id="aEmail" type="email" autocomplete="email" required></label>`:'';
+  const pw=AM!=='forgot'?`<label class="field">${AM==='reset'?'New password':'Password'}<input class="inp" id="aPass" type="password" minlength="6" autocomplete="${AM==='in'?'current-password':'new-password'}" required></label>`:'';
+  $('#authBox').innerHTML=`<div class="mh"><h2>${t}</h2><button class="del" style="opacity:1" data-act="authClose" aria-label="Close">${ic('x',16)}</button></div>
+  <form id="authForm" style="display:flex;flex-direction:column;gap:12px" novalidate>
+    ${AM==='up'?'<p class="muted" style="font-size:13px">Your data syncs to your account so you can use it on any device.</p>':AM==='forgot'?'<p class="muted" style="font-size:13px">Enter your email and we will send you a link to set a new password.</p>':''}
+    ${email}${pw}<div class="autherr" id="aErr"></div>
+    <button class="btn pri" type="submit" id="aGo">${{in:'Sign in',up:'Create account',forgot:'Send reset link',reset:'Save password'}[AM]}</button>
+  </form>
+  <div style="display:flex;justify-content:space-between;gap:8px;margin-top:14px;flex-wrap:wrap">${AM==='in'?'<button class="lnk" data-act="authOpen" data-mode="up">Create an account</button><button class="lnk" data-act="authOpen" data-mode="forgot">Forgot password?</button>':AM==='reset'?'':'<button class="lnk" data-act="authOpen" data-mode="in">Back to sign in</button>'}</div>`;
+  $('#authModal').classList.add('open');setTimeout(()=>{const f=$('#aEmail')||$('#aPass');if(f)f.focus()},40);
+}
+async function authSubmit(){
+  const em=($('#aEmail')||{}).value,pw=($('#aPass')||{}).value,err=$('#aErr'),go=$('#aGo');err.textContent='';
+  if(AM!=='reset'&&!/^\S+@\S+\.\S+$/.test(em||'')){err.textContent='Enter a valid email address.';return}
+  if(AM!=='forgot'&&(pw||'').length<6){err.textContent='Password needs at least 6 characters.';return}
+  go.disabled=true;go.textContent='Please wait';const back=location.origin+location.pathname;
+  try{
+    if(AM==='in'){const {error}=await SB.client.auth.signInWithPassword({email:em.trim(),password:pw});if(error)throw error;$('#authModal').classList.remove('open')}
+    else if(AM==='up'){const {data,error}=await SB.client.auth.signUp({email:em.trim(),password:pw,options:{emailRedirectTo:back}});if(error)throw error;
+      if(data.session)$('#authModal').classList.remove('open');else $('#authForm').innerHTML='<div class="authok">Check your email and click the link to confirm your account, then sign in.</div>'}
+    else if(AM==='forgot'){const {error}=await SB.client.auth.resetPasswordForEmail(em.trim(),{redirectTo:back});if(error)throw error;$('#authForm').innerHTML='<div class="authok">If that email has an account, a reset link is on its way.</div>'}
+    else{const {error}=await SB.client.auth.updateUser({password:pw});if(error)throw error;$('#authModal').classList.remove('open');history.replaceState(null,'',back);toast('Password updated','You are signed in','good')}
+  }catch(e){const m=String(e&&e.message||'');err.textContent=/invalid login/i.test(m)?'Email or password is not right.':/already registered/i.test(m)?'That email already has an account. Try signing in.':/rate limit/i.test(m)?'Too many attempts. Wait a minute and try again.':m||'Something went wrong. Try again.';if(go.isConnected){go.disabled=false;go.textContent={in:'Sign in',up:'Create account',forgot:'Send reset link',reset:'Save password'}[AM]}}
+}
+async function signOut(){
+  if((S.savedAt||0)>(S.syncAt||0))await pushNow();
+  await SB.client.auth.signOut();SB.user=null;S=fresh();S.flags.welcomed=true;S.flags.since=Date.now();lastSig=sig();store();setSync('off');render();
+  toast('Signed out','Your data is safe in your account and has been removed from this device','info');
 }
 
 /* ============ Events ============ */
@@ -1406,10 +1589,22 @@ document.addEventListener('click',e=>{
   if(e.target.id==='wiz'){wizClose();return}
   if(e.target.id==='ach'){closeAch();return}
   if(e.target.id==='itemModal'){$('#itemModal').classList.remove('open');return}
+  if(e.target.id==='authModal'&&!CONF){$('#authModal').classList.remove('open');return}
   const el=e.target.closest('[data-act]');if(!el)return;const a=el.dataset.act;
   if(a==='wizOpen'){wizOpen();return}
   if(a==='welcomeFresh'){S.flags.welcomed=true;$('#welcome').classList.remove('open');S.view='budgets';save();render();return}
-  if(a==='welcomeDemo'){const fl=S.flags;S=fresh();S.flags=Object.assign(fl,{welcomed:true});seed();checkAlerts(true);evalChallenges(true);save();$('#welcome').classList.remove('open');render();toast('Sample data loaded','Clear it any time in Settings when you are ready to start','info');return}
+  if(a==='welcomeDemo'){const fl=S.flags;S=fresh();S.flags=Object.assign(fl,{welcomed:true,sample:true});seed();checkAlerts(true);evalChallenges(true);save();$('#welcome').classList.remove('open');render();toast('Sample data loaded','Clear it any time in Settings when you are ready to start','info');return}
+  if(a==='account'){if(SB.user){S.view='settings';save();render();scrollTo({top:0})}else authOpen('in');return}
+  if(a==='authOpen'){authOpen(el.dataset.mode||'in');return}
+  if(a==='welcomeSignIn'){S.flags.welcomed=true;$('#welcome').classList.remove('open');save();authOpen('in');return}
+  if(a==='authClose'){$('#authModal').classList.remove('open');return}
+  if(a==='confCloud'&&CONF){$('#authModal').classList.remove('open');adopt(CONF.d,CONF.at);CONF=null;toast('Account data loaded','','good');return}
+  if(a==='confLocal'&&CONF){$('#authModal').classList.remove('open');S.syncUid=SB.user.id;S.syncAt=CONF.at;CONF=null;pushNow();toast('This device\'s data saved to your account','','good');return}
+  if(a==='syncNow'){pull();return}
+  if(a==='signOut'){signOut();return}
+  if(a==='snooze'){S.flags.snooze=Date.now()+3*DAY;save();render(true);return}
+  if(a==='install'&&installEvt){installEvt.prompt();installEvt.userChoice.finally(()=>{installEvt=null;render(true)});return}
+  if(a==='ruleDel'){const r=(S.rules||[]).find(x=>x.id===el.dataset.id);S.rules=S.rules.filter(x=>x.id!==el.dataset.id);save();render(true);if(r)toast('Rule removed',r.match,'info');return}
   if(a==='more'){$('#msheet').classList.toggle('open');return}
   if(a==='txEdit'){openModal('edit',el.dataset.id);return}
   if(a==='recNew'){openModal('new');$('#fRepeat').value='monthly';return}
@@ -1442,10 +1637,10 @@ document.addEventListener('click',e=>{
     const data=JSON.stringify(S,null,1);
     try{const u=URL.createObjectURL(new Blob([data],{type:'application/json'})),l=document.createElement('a');l.href=u;l.download='moneyboard-backup-'+iso(new Date())+'.json';document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),2000)}catch(err){}
     try{navigator.clipboard.writeText(data).then(()=>toast('Backup exported','Downloaded and copied to your clipboard','good'),()=>toast('Backup exported','The backup text is shown below','good'))}catch(err){toast('Backup exported','The backup text is shown below','good')}
-    S.flags.backup=true;commit();const b=$('#exportBox');if(b){b.style.display='block';b.value=data}
+    S.flags.backup=true;S.flags.backupAt=Date.now();commit();const b=$('#exportBox');if(b){b.style.display='block';b.value=data}
   }
-  else if(a==='demo'){const keep={xp:S.xp,unlocked:S.unlocked,settings:S.settings,notifs:S.notifs};S=Object.assign(fresh(),keep);seed();S.view='dashboard';checkAlerts(true);evalChallenges(true);save();render();toast('Sample data loaded','','info')}
-  else if(a==='clear'){if(el.dataset.armed){S=fresh();S.flags.welcomed=true;save();render();toast('All data cleared','Add your first transaction to begin','info')}else{el.dataset.armed=1;el.querySelector('span').textContent='Click again to confirm';setTimeout(()=>{if(el.isConnected){delete el.dataset.armed;el.querySelector('span').textContent='Clear all data'}},4000)}}
+  else if(a==='demo'){const keep={xp:S.xp,unlocked:S.unlocked,settings:S.settings,notifs:S.notifs};S=Object.assign(fresh(),keep,{syncUid:S.syncUid,syncAt:S.syncAt});S.flags.welcomed=true;S.flags.sample=true;seed();S.view='dashboard';checkAlerts(true);evalChallenges(true);save();render();toast('Sample data loaded','','info')}
+  else if(a==='clear'){if(el.dataset.armed){S=Object.assign(fresh(),{syncUid:S.syncUid,syncAt:S.syncAt});S.flags.welcomed=true;S.flags.since=Date.now();save();render();toast('All data cleared','Add your first transaction to begin','info')}else{el.dataset.armed=1;el.querySelector('span').textContent='Click again to confirm';setTimeout(()=>{if(el.isConnected){delete el.dataset.armed;el.querySelector('span').textContent='Clear all data'}},4000)}}
 });
 document.addEventListener('input',e=>{const t=e.target;
   if(t.id==='fq'){F.q=t.value;renderTxList()}
@@ -1458,10 +1653,11 @@ document.addEventListener('change',e=>{const t=e.target;
   if(t.id==='fc'){F.cat=t.value;renderTxList()}
   else if(t.id==='pcut'){P.cut=t.value;renderCut()}
   else if(t.id==='sCur'){S.settings.currency=t.value;save();render()}
-  else if(t.id==='bankFile'&&t.files[0]){const r=new FileReader();r.onload=()=>{try{const res=importBankCSV(String(r.result));save();render(true);toast(res.added+' transactions imported',(res.dup?res.dup+' duplicates skipped. ':'')+'Categories were guessed, check them in Transactions','good');evalChallenges();save()}catch(err){toast('Could not read that file','Export a CSV statement from your bank and try again','bad')}t.value=''};r.readAsText(t.files[0])}
-  else if(t.id==='importFile'&&t.files[0]){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.txns))throw 0;S=Object.assign(fresh(),d);save();render();toast('Backup restored',S.txns.length+' transactions loaded','good')}catch(err){toast('Import failed','Choose a Moneyboard backup file (.json)','bad')}};r.readAsText(t.files[0])}
+  else if(t.id==='bankFile'&&t.files[0]){const r=new FileReader();r.onload=()=>{try{const res=importBankCSV(String(r.result));save();render(true);toast(res.added+' transaction'+(res.added===1?'':'s')+' imported',(res.dup?res.dup+' duplicates skipped. ':'')+'Categories were guessed, check them in Transactions','good');evalChallenges();save()}catch(err){toast('Could not read that file','Export a CSV statement from your bank and try again','bad')}t.value=''};r.readAsText(t.files[0])}
+  else if(t.id==='importFile'&&t.files[0]){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.txns))throw 0;S=Object.assign(fresh(),d,{syncUid:S.syncUid,syncAt:S.syncAt,view:S.view});S.flags.welcomed=true;S.flags.sample=false;save();render();toast('Backup restored',S.txns.length+' transactions loaded','good')}catch(err){toast('Import failed','Choose a Moneyboard backup file (.json)','bad')}};r.readAsText(t.files[0])}
 });
 document.addEventListener('submit',e=>{
+  if(e.target.id==='authForm'){e.preventDefault();authSubmit();return}
   if(e.target.id==='itemForm'){e.preventDefault();const name=$('#iName').value.trim(),cat=$('#iCat').value,amt=parseAmt($('#iAmt').value);if(!name||!(amt>0)){$('#iAmt').focus();return}
     const ex=IM.id&&S.items.find(x=>x.id===IM.id);if(ex){if(ex.name!==name||ex.cat!==cat)ex.key=null;Object.assign(ex,{name,cat,amt,freq:IM.f})}else S.items.push({id:uid(),key:null,cat,name,amt,freq:IM.f});
     $('#itemModal').classList.remove('open');if(cat!=='Income')OPEN.add(cat);commit();toast('Budget item saved',name+': '+money(amt*FREQ[IM.f][1],2)+' a week','good');return}
@@ -1481,14 +1677,16 @@ document.addEventListener('keydown',e=>{
     else if(e.key==='Escape')wizClose();
     return;
   }
-  if(e.key==='Escape'){$('#modal').classList.remove('open');$('#itemModal').classList.remove('open');$('#npanel').classList.remove('open');$('#msheet').classList.remove('open')}
+  if(e.key==='Escape'){if(!CONF)$('#authModal').classList.remove('open');$('#modal').classList.remove('open');$('#itemModal').classList.remove('open');$('#npanel').classList.remove('open');$('#msheet').classList.remove('open')}
   if((e.key==='n'||e.key==='N')&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&!document.querySelector('.modal.open')){e.preventDefault();openModal()}
 });
 
 /* ============ Boot ============ */
 const bootRec=runRecurring();recurringNotice(bootRec,true);
-checkAlerts(true);evalChallenges(true);save();render();
-document.addEventListener('visibilitychange',()=>{if(!document.hidden){const n=runRecurring();if(n){recurringNotice(n);commit()}}});
+checkAlerts(true);evalChallenges(true);save(true);render();renderSync();sbLoad();
+document.addEventListener('visibilitychange',()=>{if(document.hidden){if(SB.user&&(S.savedAt||0)>(S.syncAt||0))pushNow();return}if(SB.user){pull();return}const n=runRecurring();if(n){recurringNotice(n);commit()}});
+addEventListener('online',()=>{if(SB.user)pull()});
+if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 setTimeout(()=>{
   if(!S.flags.welcomed&&!S.txns.length&&!S.items.length&&!S.goals.length){$('#welcome').classList.add('open');return}
   if(bootRec)toast(bootRec+' repeating transaction'+(bootRec>1?'s':'')+' logged','Repeating items were added on their due dates','info');
