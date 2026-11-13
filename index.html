@@ -166,6 +166,20 @@ select.inp{padding-right:30px;appearance:none;background-image:url("data:image/s
 @keyframes fade{to{opacity:1}}
 .growy{transform-box:fill-box;transform-origin:bottom;transform:scaleY(0);animation:gy .9s cubic-bezier(.2,.7,.2,1) forwards}
 @keyframes gy{to{transform:scaleY(1)}}
+.insg{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:28px}
+.insl{display:flex;flex-direction:column;gap:10px}
+.ins{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:12px;background:#f7f8fa;font-size:13px;line-height:1.45;color:var(--text)}
+.ins .ii{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:none;background:#fff;color:var(--muted);border:1px solid var(--line2)}
+.ins.bad .ii{color:var(--neg);background:var(--neg-soft);border-color:transparent}
+.ins.good .ii{color:var(--accent);background:var(--accent-soft);border-color:transparent}
+.ins b{color:var(--ink);font-weight:600}
+.cmp{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--line2)}
+.cmp:last-child{border-bottom:0}
+.cmp .cb{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.cmp .ct{display:flex;justify-content:space-between;gap:8px;font-size:13px;margin-bottom:2px}
+.cmp .ct .nm{color:var(--ink);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmp .bar.pv{height:4px}
+.cmp .cc{width:62px;text-align:right;flex:none}
 .legend{display:flex;gap:16px;font-size:12px;color:var(--muted);flex-wrap:wrap}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .legend i{width:8px;height:8px;border-radius:2px;display:inline-block}
@@ -417,6 +431,7 @@ select.inp{padding-right:30px;appearance:none;background-image:url("data:image/s
   .app{grid-template-columns:1fr}.side{display:none}
   .main{padding:18px 16px 110px}
   .c2,.c3,.w21{grid-template-columns:1fr}
+  .insg{grid-template-columns:1fr;gap:20px}
   .top .btn.pri{display:none}
   .kpis{grid-template-columns:1fr}.kpi{border-right:0;border-bottom:1px solid var(--line2)}.kpi:last-child{border:0}
   .fab{display:grid;place-items:center;position:fixed;right:18px;bottom:82px;width:54px;height:54px;border-radius:16px;background:var(--accent);color:#fff;z-index:30;box-shadow:0 8px 24px rgba(14,122,92,.35)}
@@ -941,6 +956,53 @@ function fmtVal(v,f){return f==='pct'?Math.round(v)+'%':f==='int'?Math.round(v).
 function delta(a,b,inverse){if(!b)return '<span class="chip nt">No prior data</span>';const x=(a-b)/Math.abs(b)*100,good=inverse?x<=0:x>=0;return '<span class="chip '+(good?'up':'dn')+'">'+ic(x>=0?'up':'down',12,2.2)+Math.abs(x).toFixed(0)+'%</span>'}
 function empty(icon,text){return '<div class="empty">'+ic(icon,28,1.5)+text+'</div>'}
 
+/* ============ Spending insights ============ */
+function insightsCard(ym){
+  const pv=shiftYM(ym,-1),isCur=ym===curYM(),N=daysIn(ym);
+  const cut=isCur?new Date().getDate():N,pcut=isCur?Math.min(cut,daysIn(pv)):daysIn(pv);
+  const spendTx=(m,upTo)=>monthTx(m).filter(x=>x.type==='expense'&&!isSave(x.cat)&&+x.date.slice(8)<=upTo);
+  const cur=spendTx(ym,cut),prev=spendTx(pv,pcut);
+  const byCat=l=>{const o={};l.forEach(x=>o[x.cat]=(o[x.cat]||0)+x.amount);return o};
+  const a=byCat(cur),b=byCat(prev),tA=sum(a),tB=sum(b),pm=ymLabel(pv,'s');
+  const vsTxt=isCur?'the same point in '+pm:pm;
+  if(!tA&&!tB)return `<div class="card" style="margin-bottom:16px"><div class="ch"><h3>Spending insights</h3></div>${empty('trend','Log some spending and your insights will show up here')}</div>`;
+
+  const cats=[...new Set([...Object.keys(a),...Object.keys(b)])].map(c=>[c,a[c]||0,b[c]||0]);
+  const ins=[];
+  const moves=cats.map(([c,x,y])=>[c,x-y,x,y]).filter(m=>Math.abs(m[1])>=20);
+  const upM=moves.filter(m=>m[1]>0).sort((p,q)=>q[1]-p[1])[0],dnM=moves.filter(m=>m[1]<0).sort((p,q)=>p[1]-q[1])[0];
+  if(tB){
+    if(upM)ins.push(['bad','up',`<b>${esc(upM[0])}</b> is up <b>${money(upM[1])}</b>${upM[3]?' ('+Math.round(upM[1]/upM[3]*100)+'%)':''} on ${vsTxt}`]);
+    if(dnM)ins.push(['good','down',`<b>${esc(dnM[0])}</b> is down <b>${money(-dnM[1])}</b> on ${vsTxt}`]);
+  }
+  if(isCur&&cut>=3&&tA){
+    const proj=tA/cut*N,tb=totalBudget();
+    if(tb)ins.push([proj>tb?'bad':'good','trend',`On this pace you will spend about <b>${money(proj)}</b> in ${ymLabel(ym,'m')}, ${proj>tb?'<b>'+money(proj-tb)+' over</b>':'<b>'+money(tb-proj)+' under</b>'} your budget`]);
+    else ins.push(['','trend',`On this pace you will spend about <b>${money(proj)}</b> in ${ymLabel(ym,'m')}`]);
+  }
+  if(tA){
+    const pay={};cur.forEach(x=>{const k=normNote(x.note);if(!k)return;(pay[k]=pay[k]||{n:String(x.note).trim(),v:0,c:0});pay[k].v+=x.amount;pay[k].c++});
+    const top=Object.values(pay).sort((p,q)=>q.v-p.v)[0];
+    if(top&&top.c>1)ins.push(['','bag',`Most money went to <b>${esc(top.n.length>28?top.n.slice(0,28)+'...':top.n)}</b>, ${money(top.v)} over ${top.c} transactions`]);
+    const avgA=tA/cut,avgB=tB/(pcut||1);
+    if(tB)ins.push([avgA>avgB?'bad':'good','calendar',`Averaging <b>${money(avgA)}</b> a day, ${avgA>avgB?'up':'down'} from ${money(avgB)} in ${pm}`]);
+    else{const dd={};cur.forEach(x=>dd[x.date]=(dd[x.date]||0)+x.amount);const big=Object.entries(dd).sort((p,q)=>q[1]-p[1])[0];
+      if(big){const [y,m,d]=big[0].split('-').map(Number);ins.push(['','calendar',`Biggest day was <b>${new Date(y,m-1,d).toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'})}</b> at ${money(big[1])}`])}}
+  }
+  if(!tB)ins.push(['','info',`No spending logged in ${pm}, so there is nothing to compare against yet`]);
+
+  const rows=cats.sort((p,q)=>Math.max(q[1],q[2])-Math.max(p[1],p[2])).slice(0,7),mx=Math.max(1,...rows.map(r=>Math.max(r[1],r[2])));
+  const chg=(x,y)=>{if(!y)return '<span class="chip nt">New</span>';if(!x)return '<span class="chip up">'+ic('down',12,2.2)+'100%</span>';const d=(x-y)/y*100;return Math.abs(d)<1?'<span class="chip nt">Same</span>':'<span class="chip '+(d>0?'dn':'up')+'">'+ic(d>0?'up':'down',12,2.2)+Math.abs(d).toFixed(0)+'%</span>'};
+  const list=rows.map(([c,x,y])=>{const inf=CATS[c]||CATS.Other;return `<div class="cmp">${catChip(inf,28)}<div class="cb"><div class="ct"><span class="nm">${esc(c)}</span><span><span class="amt">${money(x)}</span> <span class="subtle">/ ${money(y)}</span></span></div>${bar(x/mx,inf.c,6)}<div class="bar pv"><i data-w="${(clamp(y/mx)*100).toFixed(1)}" style="background:#c9ced6"></i></div></div><span class="cc">${chg(x,y)}</span></div>`}).join('');
+
+  return `<div class="card" style="margin-bottom:16px"><div class="ch"><h3>Spending insights</h3><span class="s">${ymLabel(ym,'s')} vs ${vsTxt}</span></div>
+    <div class="insg">
+      <div class="insl">${ins.slice(0,4).map(([k,i,t])=>`<div class="ins ${k}"><span class="ii">${ic(i,15,2)}</span><span>${t}</span></div>`).join('')}</div>
+      <div><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px"><span class="eyebrow">By category</span><span class="muted" style="font-size:12px">Coloured bar ${ymLabel(ym,'s')}, grey bar ${pm}</span></div>${list}
+      <div class="muted" style="font-size:12px;margin-top:10px">Total ${money(tA)} vs ${money(tB)}${isCur?', both counted to day '+cut:''}. Savings and transfers are left out.</div></div>
+    </div></div>`;
+}
+
 /* ============ Views ============ */
 const V={};
 
@@ -1041,6 +1103,8 @@ V.dashboard=()=>{
       <div class="legend" style="margin-top:8px"><span><i class="dash"></i>Daily allowance ${money(wb/7)}</span><span><i style="background:#0e7a5c"></i>Today</span></div>
     </div>
   </div>
+
+  ${insightsCard(ym)}
 
   <div class="grid c2">
     <div class="card"><div class="ch"><h3>Spending by category</h3><button class="lnk" data-act="nav" data-view="transactions">Details ${ic('chevR',14)}</button></div>
