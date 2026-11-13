@@ -1,5 +1,5 @@
 /* Moneyboard offline support. Pages load fresh when online and fall back to the saved copy when offline. */
-const CACHE = 'moneyboard-v3';
+const CACHE = 'moneyboard-v4';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE))); self.skipWaiting(); });
 self.addEventListener('activate', e => {
@@ -25,4 +25,9 @@ self.addEventListener('notificationclick', e => {
     for (const c of list) { if ('focus' in c) return c.focus(); }
     return self.clients.openWindow('./');
   }));
+});
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (err) { d = { body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'Moneyboard', { body: d.body || '', tag: d.tag || 'moneyboard', icon: 'icon-192.png', badge: 'icon-192.png' }));
 });

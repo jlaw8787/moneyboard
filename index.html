@@ -728,6 +728,7 @@ let S = load(), firstRun=false;
 if(!S){S=fresh();firstRun=true}
 S = Object.assign(fresh(),S);
 lastSig=sig();if(!S.flags.since)S.flags.since=Date.now();
+try{const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;if(tz&&S.settings.tz!==tz)S.settings.tz=tz}catch(e){}
 
 function seed(){
   const now=new Date(), rnd=(a,b)=>Math.round(a+Math.random()*(b-a)), pick=a=>a[Math.floor(Math.random()*a.length)];
@@ -945,7 +946,7 @@ function checkBills(silent){
   if(days)upcomingBills(days).forEach(({r,date})=>{
     const k='bill|'+r.id+'|'+date,nm=r.note||r.cat,n=daysUntil(date),title=nm+' due '+whenText(n),body=money(r.amount,2)+' on '+new Date(date+'T00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
     if(!S.alerted[k]){S.alerted[k]=1;notify(title,body,'warn');if(!silent)toast(title,body,'warn')}
-    if(!sent[k]&&S.settings.phoneAlerts){sent[k]=1;sysNotify(title,body,k)}
+    if(!sent[k]&&S.settings.phoneAlerts&&!pushOn()){sent[k]=1;sysNotify(title,body,k)}
   });
   try{localStorage.setItem('mb-billalerts',JSON.stringify(sent))}catch(e){}
 }
@@ -955,12 +956,31 @@ function billsCard(){
   ${L.length?L.slice(0,6).map(({r,date})=>{const n=daysUntil(date),ci=CATS[r.cat]||CATS.Other;return `<div class="lrow">${catChip(ci,28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(r.note||r.cat)}</div><div class="sb">${new Date(date+'T00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'})}</div></div><span class="pill ${days&&n<=days?'warn':'nt'}">${n<=0?'Today':n===1?'Tomorrow':'In '+n+' days'}</span><span class="amt" style="width:84px;text-align:right">${money(r.amount,2)}</span></div>`}).join('')+(L.length>6?`<div class="muted" style="font-size:12.5px;margin-top:10px">Plus ${L.length-6} more</div>`:''):`<div class="empty">${ic('calendar',28,1.5)}No repeating bills due in the next two weeks<div style="margin-top:12px"><button class="btn sec sm" data-act="recNew">${ic('plus',14,2)}Add a repeating bill</button></div></div>`}
   </div>`;
 }
+/* Closed-app alerts: a push subscription saved to the account, sent each morning by the server */
+const VAPID_PUBLIC='BE2CJgC8vIYssHLIC7b1GZKSUiqBWPYJv-FpoDFHdMtj3fpNqG7f9hU4NE2Ed3fIblx4IfMrrqnQAXWtmYL7emY';
+const pushOn = () => {try{return !!localStorage.getItem('mb-push')}catch(e){return false}};
+const canPush = () => 'serviceWorker' in navigator && 'PushManager' in window && location.protocol==='https:';
+function b64u(s){const p='='.repeat((4-s.length%4)%4),b=atob((s+p).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(b,c=>c.charCodeAt(0))}
+async function pushSubscribe(){
+  if(!SB.user||!SB.client||!canPush()||!('Notification' in window)||Notification.permission!=='granted')return false;
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    const sub=(await reg.pushManager.getSubscription())||(await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(VAPID_PUBLIC)}));
+    const j=sub.toJSON(),{error}=await SB.client.from('push_subs').upsert({user_id:SB.user.id,endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth},{onConflict:'endpoint'});
+    if(error)throw error;localStorage.setItem('mb-push',j.endpoint);return true;
+  }catch(e){try{localStorage.removeItem('mb-push')}catch(_){}return false}
+}
+async function pushUnsubscribe(){
+  try{const ep=localStorage.getItem('mb-push');localStorage.removeItem('mb-push');
+    if(ep&&SB.client&&SB.user)await SB.client.from('push_subs').delete().eq('endpoint',ep);
+    if(canPush()){const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();if(sub)await sub.unsubscribe()}}catch(e){}
+}
 function remindCard(){
   const has='Notification' in window,perm=has?Notification.permission:'denied',on=S.settings.phoneAlerts&&perm==='granted';
   return `<div class="ch"><h3>Bill reminders</h3></div>
     <label class="field" style="max-width:260px">Remind me<select class="inp" id="sRemind">${[[0,'Off'],[1,'1 day before'],[2,'2 days before'],[3,'3 days before'],[7,'A week before']].map(([v,l])=>`<option value="${v}" ${remindDays()===v?'selected':''}>${l}</option>`).join('')}</select></label>
-    <p class="muted" style="font-size:13px;margin:14px 0">Reminders come from your repeating expenses and show in the bell. Phone alerts also pop up on your phone or computer when Moneyboard is open or brought back up. They can't come through while the app is fully closed.</p>
-    ${!has?'<div class="recnote">This browser does not support alerts. On an iPhone, add Moneyboard to your home screen first, then open it from there.</div>':perm==='denied'?'<div class="recnote">Alerts are blocked for this site. Turn them on in your browser or phone settings, then come back here.</div>':on?`<div style="display:flex;gap:8px;flex-wrap:wrap"><span class="pill ok" style="height:30px;padding:0 12px">${ic('check',13,2.4)}&nbsp;Phone alerts on</span><button class="btn sec sm" data-act="alertsOff">Turn off</button><button class="btn sec sm" data-act="alertsTest">Send a test</button></div>`:`<button class="btn sec" data-act="alertsOn">${ic('bell',16)}Turn on phone alerts</button>`}`;
+    <p class="muted" style="font-size:13px;margin:14px 0">Reminders come from your repeating expenses and show in the bell. Phone alerts pop up on this device too. ${SB.user?'Because you are signed in, they also come through at 7am each morning when the app is closed.':'Sign in and they will also come through at 7am each morning when the app is closed. Without signing in they only show while the app is open.'}</p>
+    ${!has?'<div class="recnote">This browser does not support alerts. On an iPhone, add Moneyboard to your home screen first, then open it from there.</div>':perm==='denied'?'<div class="recnote">Alerts are blocked for this site. Turn them on in your browser or phone settings, then come back here.</div>':on?`${SB.user&&!pushOn()&&canPush()?'<div class="recnote" style="margin:0 0 12px">Alerts are on while the app is open. Tap Turn off, then turn them back on to get alerts while it is closed too.</div>':''}<div style="display:flex;gap:8px;flex-wrap:wrap"><span class="pill ok" style="height:30px;padding:0 12px">${ic('check',13,2.4)}&nbsp;${pushOn()?'Alerts on, even when closed':'Phone alerts on'}</span><button class="btn sec sm" data-act="alertsOff">Turn off</button><button class="btn sec sm" data-act="alertsTest">Send a test</button></div>`:`<button class="btn sec" data-act="alertsOn">${ic('bell',16)}Turn on phone alerts</button>`}`;
 }
 
 function toast(title,body,kind){
@@ -1595,7 +1615,7 @@ function sbInit(){
   SB.client.auth.onAuthStateChange((ev,session)=>{
     const u=session?session.user:null;
     if(ev==='PASSWORD_RECOVERY')setTimeout(()=>authOpen('reset'),0);
-    if(u&&(!SB.user||SB.user.id!==u.id)){SB.user=u;setTimeout(pull,0)}
+    if(u&&(!SB.user||SB.user.id!==u.id)){SB.user=u;setTimeout(()=>pull().then(()=>{if(S.settings.phoneAlerts)pushSubscribe().then(()=>{const c=$('#remindCard');if(c)c.innerHTML=remindCard()})}),0)}
     else if(!u&&SB.user){SB.user=null;setSync('off')}
   });
   renderSync();
@@ -1685,7 +1705,7 @@ async function authSubmit(){
 }
 async function signOut(){
   if((S.savedAt||0)>(S.syncAt||0))await pushNow();
-  await SB.client.auth.signOut();SB.user=null;S=fresh();S.flags.welcomed=true;S.flags.since=Date.now();lastSig=sig();store();setSync('off');render();
+  await pushUnsubscribe();await SB.client.auth.signOut();SB.user=null;S=fresh();S.flags.welcomed=true;S.flags.since=Date.now();lastSig=sig();store();setSync('off');render();
   toast('Signed out','Your data is safe in your account and has been removed from this device','info');
 }
 
@@ -1718,9 +1738,12 @@ document.addEventListener('click',e=>{
   if(a==='ruleDel'){const r=(S.rules||[]).find(x=>x.id===el.dataset.id);S.rules=S.rules.filter(x=>x.id!==el.dataset.id);save();render(true);if(r)toast('Rule removed',r.match,'info');return}
   if(a==='more'){$('#msheet').classList.toggle('open');return}
   if(a==='txEdit'){openModal('edit',el.dataset.id);return}
-  if(a==='alertsOn'){if(!('Notification' in window))return;Notification.requestPermission().then(p=>{S.settings.phoneAlerts=p==='granted';save();$('#remindCard').innerHTML=remindCard();if(p==='granted'){toast('Phone alerts on','You will get a pop-up when a bill is close','good');sysNotify('Phone alerts are on','Bill reminders will show up like this','test')}else toast('Alerts not allowed','You can change this in your browser settings','warn')});return}
-  if(a==='alertsOff'){S.settings.phoneAlerts=false;save();$('#remindCard').innerHTML=remindCard();return}
-  if(a==='alertsTest'){sysNotify('Test alert','Bill reminders will show up like this','test');return}
+  if(a==='alertsOn'){if(!('Notification' in window))return;Notification.requestPermission().then(async p=>{S.settings.phoneAlerts=p==='granted';save();
+    if(p!=='granted'){$('#remindCard').innerHTML=remindCard();toast('Alerts not allowed','You can change this in your browser settings','warn');return}
+    const closed=await pushSubscribe();$('#remindCard').innerHTML=remindCard();
+    toast('Phone alerts on',closed?'You will get bill alerts even when the app is closed':'You will get a pop-up when a bill is close','good');sysNotify('Phone alerts are on','Bill reminders will show up like this','test')});return}
+  if(a==='alertsOff'){S.settings.phoneAlerts=false;save();pushUnsubscribe().then(()=>{$('#remindCard').innerHTML=remindCard()});return}
+  if(a==='alertsTest'){if(pushOn()&&SB.client){el.disabled=true;SB.client.functions.invoke('bill-reminders',{body:{test:true}}).then(({data,error})=>{el.disabled=false;if(error||!data||!data.sent)toast('Test did not go through','Turn alerts off and on again, then retry','warn');else toast('Test sent','It can take a few seconds to arrive','good')})}else sysNotify('Test alert','Bill reminders will show up like this','test');return}
   if(a==='recNew'){openModal('new');$('#fRepeat').value='monthly';return}
   if(a==='recEdit'){openModal('rule',el.dataset.id);return}
   if(a==='recDel'){const r=S.recurring.find(x=>x.id===el.dataset.id);S.recurring=S.recurring.filter(x=>x.id!==el.dataset.id);save();render(true);if(r)toast('Stopped repeating '+(r.note||r.cat),'Past transactions are kept','info');return}
