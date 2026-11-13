@@ -464,6 +464,23 @@ select.inp{padding-right:30px;appearance:none;background-image:url("data:image/s
 }
 @media (max-width:560px){.freq{grid-template-columns:repeat(3,minmax(0,1fr))}.items{padding-left:8px}.c4{grid-template-columns:1fr}.inputs4{grid-template-columns:1fr 1fr}.hero .big{font-size:36px}.catpick{grid-template-columns:repeat(4,1fr)}}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+/* Monthly report */
+.rphead{margin:4px 0 16px}.rphead h2{font-size:22px;font-weight:600;letter-spacing:-.02em;color:var(--ink)}.rphead p{font-size:13px;margin-top:2px}
+.rpstat .v{font-size:26px;font-weight:600;letter-spacing:-.025em;color:var(--ink);margin:6px 0 6px}
+.rppts{display:grid;gap:12px}
+.rppt{display:flex;gap:12px;align-items:flex-start;font-size:13.5px;color:var(--text)}.rppt b{color:var(--ink);font-weight:600}
+.rppt .ii{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;flex:none;margin-top:-4px}
+.rpcats .bar{margin-top:6px;height:4px;max-width:240px}
+.rpwk{display:grid;grid-template-columns:110px minmax(0,1fr) 80px;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line2);font-size:13px}.rpwk:last-child{border-bottom:0}.rpwk .amt{text-align:right}
+.rpnudge{display:flex;align-items:center;gap:14px;padding:16px 20px}.rpnudge .grow{flex:1;min-width:0}.rpnudge .nm{font-weight:600;color:var(--ink)}.rpnudge .sb{font-size:12.5px;color:var(--muted)}
+@media (max-width:560px){.rpnudge{flex-wrap:wrap}.rpnudge .btn{width:100%;justify-content:center}.rpwk{grid-template-columns:90px minmax(0,1fr) 70px}.grid.c4.rpgrid{grid-template-columns:1fr 1fr;gap:10px}.rpstat{padding:14px}.rpstat .v{font-size:21px}}
+@media print{
+  body{background:#fff}
+  .side,.bnav,.fab,.msheet,.npanel,#toasts,#fx,.top .ctl,#bellBtn,#addBtn,.rpbar .btn{display:none!important}
+  .app{display:block}.main{padding:0;max-width:none}.top{margin-bottom:8px}
+  .card{box-shadow:none;animation:none!important;opacity:1!important;break-inside:avoid}
+  .bar i{transition:none}.grid.c4{grid-template-columns:repeat(4,minmax(0,1fr))}.grid.c2{grid-template-columns:repeat(2,minmax(0,1fr))}.table .hm{display:table-cell!important}
+}
 </style>
 </head>
 <body>
@@ -705,7 +722,7 @@ const grpInfo = g => g==='Income'?{i:'wallet',c:'#0e7a5c'}:(CATS[g]||CATS.Other)
 const GOAL_ICONS = ['shield','plane','home','car','gem','cap','sun','laptop','heart','gift'];
 const GOAL_COLS = ['#0e7a5c','#3f63a8','#cf8a3b','#8668ad','#4a9792','#b65b73'];
 const VIEWS = {
-  dashboard:['grid','Dashboard'], transactions:['swap','Transactions'], budgets:['pie','Budgets'],
+  dashboard:['grid','Dashboard'], transactions:['swap','Transactions'], budgets:['pie','Budgets'], report:['book','Report'],
   goals:['flag','Goals'], challenges:['trophy','Challenges'], planner:['trend','Planner'], settings:['sliders','Settings']
 };
 const LEVEL_XP = 250;
@@ -935,7 +952,7 @@ function checkAlerts(silent){
     if(p>=1&&!S.alerted[k+'|100']){S.alerted[k+'|100']=S.alerted[k+'|80']=1;notify(c+' is over budget',money(sp)+' spent of '+money(b),'bad');if(!silent)toast(c+' is over budget',money(sp)+' spent of '+money(b),'bad')}
     else if(p>=.8&&p<1&&!S.alerted[k+'|80']){S.alerted[k+'|80']=1;notify(c+' at '+Math.round(p*100)+'% of budget',money(b-sp)+' left this month','warn');if(!silent)toast(c+' at '+Math.round(p*100)+'% of budget',money(b-sp)+' left this month','warn')}
   }
-  checkBills(silent);
+  checkBills(silent);checkReport();
 }
 /* ============ Bill reminders ============ */
 const remindDays = () => S.settings.remind==null?3:+S.settings.remind;
@@ -1147,6 +1164,7 @@ V.dashboard=()=>{
   return `
   ${backupBanner()}
   ${player}
+  ${reportNudge()}
   <div class="card hero" style="margin-bottom:16px">
     <div class="hm">
       <div class="eyebrow">Net saved in ${ymLabel(ym,'m')}</div>
@@ -1403,13 +1421,143 @@ V.settings=()=>`
     </div>
   </div>`;
 
+/* ============ Monthly report ============ */
+const titleCase = s => s.replace(/\b[a-z]/g,c=>c.toUpperCase());
+const plain = h => {const d=document.createElement('div');d.innerHTML=h;return d.textContent};
+function totalsTo(ym,day){let inc=0,exp=0,sav=0;for(const t of monthTx(ym)){if(+t.date.slice(8)>day)continue;if(t.type==='income')inc+=t.amount;else if(t.type==='expense'){if(isSave(t.cat))sav+=t.amount;else exp+=t.amount}}return {inc,exp,sav,net:inc-exp,rate:inc?(inc-exp)/inc:0}}
+function groupBy(list,keyFn){const o={};list.forEach(x=>{const k=keyFn(x);(o[k]=o[k]||{k,n:0,v:0,items:[]});o[k].n++;o[k].v+=x.amount;o[k].items.push(x)});return Object.values(o).sort((a,b)=>b.v-a.v)}
+function topCat(items){const o={};items.forEach(x=>o[x.cat]=(o[x.cat]||0)+x.amount);return Object.entries(o).sort((a,b)=>b[1]-a[1])[0][0]}
+function reportData(ym){
+  const tx=monthTx(ym),pv=shiftYM(ym,-1),N=daysIn(ym),isCur=ym===curYM();
+  const cut=isCur?new Date().getDate():N,pcut=isCur?Math.min(cut,daysIn(pv)):daysIn(pv);
+  const spend=tx.filter(x=>x.type==='expense'&&!isSave(x.cat)),saves=tx.filter(x=>x.type==='expense'&&isSave(x.cat));
+  const ins=tx.filter(x=>x.type==='income'),xf=tx.filter(x=>x.type==='transfer');
+  const T=totals(ym),P=totalsTo(pv,pcut),PF=totals(pv);
+  const prevSpend=monthTx(pv).filter(x=>x.type==='expense'&&!isSave(x.cat)&&+x.date.slice(8)<=pcut);
+  const pc={};prevSpend.forEach(x=>pc[x.cat]=(pc[x.cat]||0)+x.amount);
+  const cc={};spend.forEach(x=>cc[x.cat]=(cc[x.cat]||0)+x.amount);
+  const bm=BM();
+  const cats=[...new Set([...Object.keys(cc),...Object.keys(pc)])].map(c=>({c,a:cc[c]||0,b:pc[c]||0,bud:bm[c]||0})).sort((x,y)=>y.a-x.a||y.b-x.b);
+  const merch=groupBy(spend,x=>(x.src==='bank'?suggestKey(x.note):normNote(x.note))||'('+x.cat+')').map(m=>{const t0=m.items[0];return Object.assign(m,{name:m.k[0]==='('?m.k.slice(1,-1):t0.src==='bank'?titleCase(m.k):t0.note.trim(),cat:topCat(m.items)})});
+  const big=[...spend].sort((a,b)=>b.amount-a.amount).slice(0,5);
+  const incSrc=groupBy(ins,x=>x.cat);
+  const wk=[];for(let s=1;s<=N;s+=7){const e=Math.min(s+6,N);wk.push({s,e,v:spend.filter(x=>{const d=+x.date.slice(8);return d>=s&&d<=e}).reduce((a,x)=>a+x.amount,0),future:isCur&&s>cut})}
+  const accts=[...new Set(tx.map(x=>x.acct).filter(Boolean))].sort().map(a=>{const l=tx.filter(x=>x.acct===a),s=f=>l.filter(f).reduce((q,x)=>q+x.amount,0);return {a,inc:s(x=>x.type==='income'),out:s(x=>x.type==='expense'),xin:s(x=>x.type==='transfer'&&x.dir==='in'),xout:s(x=>x.type==='transfer'&&x.dir!=='in')}});
+  const moved=xf.filter(x=>x.dir!=='in').reduce((a,x)=>a+x.amount,0);
+  return {ym,pv,N,isCur,cut,tx,spend,saves,ins,xf,T,P,PF,cats,merch,big,incSrc,wk,accts,moved,savTot:saves.reduce((a,x)=>a+x.amount,0),tb:totalBudget()};
+}
+function reportPoints(R){
+  const pm=ymLabel(R.pv,'s'),mm=ymLabel(R.ym,'m'),vs=R.isCur?'the same point in '+pm:pm,pts=[],{T,P}=R;
+  if(P.exp){const d=T.exp-P.exp;pts.push([d<=0?'good':'bad',d<=0?'down':'up',`You spent <b>${money(T.exp)}</b>${R.isCur?' so far':''}, <b>${money(Math.abs(d))} ${d<=0?'less':'more'}</b> than ${vs}`])}
+  else pts.push(['','wallet',`You spent <b>${money(T.exp)}</b>${R.isCur?' so far':''} in ${mm}`]);
+  const top=R.cats.find(c=>c.a>0);if(top&&T.exp)pts.push(['','pie',`<b>${esc(top.c)}</b> was your biggest cost at <b>${money(top.a)}</b>, ${Math.round(top.a/T.exp*100)}% of your spending`]);
+  if(P.exp){const mv=R.cats.map(c=>[c.c,c.a-c.b,c.b]).filter(m=>Math.abs(m[1])>=20),up=mv.filter(m=>m[1]>0).sort((a,b)=>b[1]-a[1])[0],dn=mv.filter(m=>m[1]<0).sort((a,b)=>a[1]-b[1])[0];
+    if(up)pts.push(['bad','up',`<b>${esc(up[0])}</b> went up the most, <b>${money(up[1])}</b> more than ${vs}`]);
+    if(dn)pts.push(['good','down',`<b>${esc(dn[0])}</b> came down the most, <b>${money(-dn[1])}</b> less than ${vs}`]);}
+  if(R.tb){
+    if(R.isCur){const pace=R.tb*R.cut/R.N,d=T.exp-pace;pts.push([d>0?'bad':'good','trend',`You are <b>${money(Math.abs(d))} ${d>0?'over':'under'}</b> an even budget pace for day ${R.cut}`])}
+    else{const d=T.exp-R.tb;pts.push([d>0?'bad':'good','trend',d>0?`You went <b>${money(d)} over</b> your ${money(R.tb)} monthly budget`:`You came in <b>${money(-d)} under</b> your ${money(R.tb)} monthly budget`])}
+    const over=R.cats.filter(c=>c.bud&&c.a>c.bud).map(c=>c.c);
+    if(over.length)pts.push(['bad','alert',`${over.length} categor${over.length>1?'ies':'y'} went over budget: <b>${over.map(esc).join(', ')}</b>`]);
+  }
+  const m1=R.merch.find(m=>m.k[0]!=='(');
+  if(m1)pts.push(['','cart',`You paid <b>${esc(m1.name)}</b> the most: <b>${money(m1.v)}</b> across ${m1.n} payment${m1.n>1?'s':''}`]);
+  const often=[...R.merch].filter(m=>m.k[0]!=='(').sort((a,b)=>b.n-a.n)[0];
+  if(often&&m1&&often!==m1&&often.n>=4)pts.push(['','repeat',`<b>${esc(often.name)}</b> came up most often, ${often.n} times for ${money(often.v)}`]);
+  if(T.inc)pts.push([T.rate>=.2?'good':T.rate<0?'bad':'','percent',`You kept <b>${Math.round(T.rate*100)}%</b> of what came in${R.savTot?', including <b>'+money(R.savTot)+'</b> put into savings and goals':''}. The target is 20%`]);
+  if(R.xf.length)pts.push(['','swap',`${R.xf.length} transfer${R.xf.length>1?'s':''} between your own accounts${R.moved?' ('+money(R.moved)+' moved)':''} are left out, so they do not count as spending or income`]);
+  return pts;
+}
+function reportText(ym){
+  const R=reportData(ym),{T}=R,lines=['Money report for '+ymLabel(ym)+(R.isCur?' (to '+R.cut+' '+ymLabel(ym,'s')+')':''),'',
+    'Money in: '+money(T.inc),'Spent: '+money(T.exp),'Net saved: '+money(T.net)+(T.inc?' ('+Math.round(T.rate*100)+'% of income)':''),''];
+  reportPoints(R).forEach(p=>lines.push('- '+plain(p[2])));
+  const tc=R.cats.filter(c=>c.a>0).slice(0,5);if(tc.length){lines.push('','Top categories:');tc.forEach(c=>lines.push('- '+c.c+': '+money(c.a)))}
+  return lines.join('\n');
+}
+function reportNudge(){
+  const pv=shiftYM(curYM(),-1);
+  if(S.month!==curYM()||new Date().getDate()>7||S.flags.rpSeen===pv||!monthTx(pv).length)return '';
+  const t=totals(pv);
+  return `<div class="card rpnudge" style="margin-bottom:16px">${catChip({i:'book',c:'#0e7a5c'},36)}<div class="grow"><div class="nm">Your ${ymLabel(pv,'m')} money report is ready</div><div class="sb">You spent ${money(t.exp)} and kept ${money(t.net)}. See where it all went.</div></div><button class="btn pri sm" data-act="report" data-ym="${pv}">Open report</button></div>`;
+}
+function checkReport(){
+  const pv=shiftYM(curYM(),-1),k='report|'+pv;
+  if(S.alerted[k]||!monthTx(pv).length)return;
+  S.alerted[k]=1;const t=totals(pv);
+  notify('Your '+ymLabel(pv,'m')+' money report is ready','Spent '+money(t.exp)+', kept '+money(t.net)+'. Open Report to see the details','info');
+}
+V.report=()=>{
+  const ym=S.month;
+  if(ym>curYM())return `<div class="card">${empty('book',ymLabel(ym)+' has not started yet. Use the arrows up top to pick an earlier month.')}</div>`;
+  const R=reportData(ym),{T,P}=R,pm=ymLabel(R.pv,'s'),mm=ymLabel(ym,'m');
+  if(ym===shiftYM(curYM(),-1))S.flags.rpSeen=ym;
+  if(!R.tx.length)return `<div class="card">${empty('book','Nothing logged in '+ymLabel(ym)+'. Pick another month with the arrows up top, or import a bank statement in Settings.')}</div>`;
+  const vsTxt=R.isCur?'vs same point in '+pm:'vs '+pm;
+  const stat=(lab,v,d,cap,f)=>`<div class="card rpstat"><div class="eyebrow">${lab}</div><div class="v ${v<0?'neg':''}">${count(v,f)}</div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${d}<span class="muted" style="font-size:12px">${cap}</span></div></div>`;
+  const pts=reportPoints(R),tone={good:['var(--accent)','var(--accent-soft)'],bad:['var(--neg)','var(--neg-soft)'],'':['var(--muted)','#f1f2f4']};
+  const chg=(a,b)=>{const d=a-b;if(!b&&!a)return '<span class="subtle">0</span>';if(Math.abs(d)<1)return '<span class="subtle">Same</span>';return `<span class="${d>0?'neg':'pos'}">${d>0?'+':'-'}${money(Math.abs(d))}</span>`};
+  const catMax=Math.max(1,...R.cats.map(c=>c.a));
+  const wkMax=Math.max(1,...R.wk.map(w=>w.v)),wl=w=>w.s===w.e?w.s+' '+ymLabel(ym,'s'):w.s+' to '+w.e+' '+ymLabel(ym,'s');
+  const catOf=c=>CATS[c]||CATS.Other;
+  return `
+  <div class="toolbar rpbar">
+    ${R.isCur?`<span class="pill warn">Month in progress, counted to ${R.cut} ${ymLabel(ym,'s')}</span>`:`<span class="pill ok">Full month</span>`}
+    <span class="muted" style="font-size:12.5px">${R.tx.length} transaction${R.tx.length>1?'s':''}</span>
+    <span style="flex:1"></span>
+    <button class="btn sec sm" data-act="rpCopy">${ic('layers',14)}Copy summary</button>
+    <button class="btn sec sm" data-act="rpPrint">${ic('download',14)}Print or save PDF</button>
+  </div>
+  <div class="rphead"><h2>${ymLabel(ym)}</h2><p class="muted">Your money report${R.isCur?' so far':''}. Transfers between your own accounts are left out of every number.</p></div>
+  <div class="grid c4 rpgrid">
+    ${stat('Money in',T.inc,delta(T.inc,P.inc),vsTxt)}
+    ${stat('Spent',T.exp,delta(T.exp,P.exp,true),vsTxt)}
+    ${stat('Net saved',T.net,delta(T.net,P.net),vsTxt)}
+    ${stat('Savings rate',T.rate*100,`<span class="chip ${T.rate>=.2?'up':'nt'}">${T.rate>=.2?'Above target':'Target 20%'}</span>`,'',  'pct')}
+  </div>
+
+  <div class="card" style="margin-bottom:16px"><div class="ch"><h3>The short version</h3></div>
+    <div class="rppts">${pts.map(([k,i,h])=>`<div class="rppt"><span class="ii" style="color:${tone[k][0]};background:${tone[k][1]}">${ic(i,15,2)}</span><span>${h}</span></div>`).join('')}</div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px"><div class="ch"><h3>Spending by category</h3><span class="s">${money(T.exp)} total</span></div>
+    ${R.cats.length?`<table class="table rpcats"><thead><tr><th>Category</th><th class="r">${mm}</th><th class="r hm">${pm}</th><th class="r">Change</th><th class="r hm">Budget used</th></tr></thead><tbody>
+    ${R.cats.map(c=>{const pc=c.bud?c.a/c.bud:0,s=STAT(c.c,pc);return `<tr><td><div class="desc">${catChip(catOf(c.c),28)}<div style="flex:1;min-width:0"><b>${esc(c.c)}</b>${bar(c.a/catMax,catOf(c.c).c,4)}</div></div></td><td class="r"><span class="amt">${money(c.a)}</span></td><td class="r hm muted">${money(c.b)}</td><td class="r">${chg(c.a,c.b)}</td><td class="r hm">${c.bud?`<span class="pill ${s[0]}">${Math.round(pc*100)}% of ${money(c.bud)}</span>`:'<span class="subtle">No budget</span>'}</td></tr>`}).join('')}
+    </tbody></table>`:empty('pie','No spending this month')}
+  </div>
+
+  <div class="grid c2">
+    <div class="card"><div class="ch"><h3>Where it went</h3><span class="s">Top places by total</span></div>
+      ${R.merch.length?R.merch.slice(0,8).map(m=>`<div class="lrow">${catChip(catOf(m.cat),28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(m.name)}</div><div class="sb">${m.n} payment${m.n>1?'s':''} · ${esc(m.cat)}</div></div><span class="amt">${money(m.v,2)}</span></div>`).join(''):empty('cart','No spending this month')}
+    </div>
+    <div class="card"><div class="ch"><h3>Biggest purchases</h3><span class="s">Single payments</span></div>
+      ${R.big.length?R.big.map(t=>`<div class="lrow clk" data-act="txEdit" data-id="${t.id}">${catChip(catOf(t.cat),28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(t.note||t.cat)}</div><div class="sb">${dLabel(t.date)} · ${esc(t.cat)}${t.acct?' · '+esc(t.acct):''}</div></div><span class="amt">${money(t.amount,2)}</span></div>`).join(''):empty('cart','No spending this month')}
+    </div>
+  </div>
+
+  <div class="grid c2">
+    <div class="card"><div class="ch"><h3>Money in</h3><span class="s">${money(T.inc)} total</span></div>
+      ${R.incSrc.length?R.incSrc.map(g=>`<div class="lrow">${catChip(INCATS[g.k]||INCATS['Other income'],28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(g.k)}</div><div class="sb">${g.n} payment${g.n>1?'s':''}</div></div><span class="amt in">+${money(g.v,2)}</span></div>`).join(''):empty('wallet','No income logged this month')}
+      ${R.savTot?`<div class="lrow">${catChip(CATS.Savings,28)}<div class="grow"><div class="nm" style="font-size:13px">Put into savings and goals</div><div class="sb">${R.saves.length} payment${R.saves.length>1?'s':''}, counted as saved</div></div><span class="amt">${money(R.savTot,2)}</span></div>`:''}
+    </div>
+    <div class="card"><div class="ch"><h3>Spending by week</h3><span class="s">${ymLabel(ym,'s')} in 7 day blocks</span></div>
+      ${R.wk.map(w=>`<div class="rpwk"><span class="muted">${wl(w)}</span>${w.future?'<span class="subtle" style="font-size:12.5px">Still to come</span>':bar(w.v/wkMax,'var(--accent)',6)}<span class="amt">${w.future?'':money(w.v)}</span></div>`).join('')}
+    </div>
+  </div>
+
+  ${R.accts.length?`<div class="card" style="margin-bottom:16px"><div class="ch"><h3>By account</h3><span class="s">From your bank imports</span></div>
+    <table class="table"><thead><tr><th>Account</th><th class="r">Money in</th><th class="r">Money out</th><th class="r hm">Transfers in</th><th class="r hm">Transfers out</th></tr></thead><tbody>
+    ${R.accts.map(a=>`<tr><td><b style="font-weight:500;color:var(--ink)">${esc(a.a)}</b></td><td class="r"><span class="amt in">${money(a.inc,2)}</span></td><td class="r"><span class="amt">${money(a.out,2)}</span></td><td class="r hm muted">${money(a.xin,2)}</td><td class="r hm muted">${money(a.xout,2)}</td></tr>`).join('')}
+    </tbody></table></div>`:''}`;
+};
+
 /* ============ Render ============ */
-const SUBS={dashboard:()=>ymLabel(S.month)+' overview',transactions:()=>'Every dollar in and out',budgets:()=>'Your budget, tracked week by week',goals:()=>'Savings goals and progress',challenges:()=>'Badges, XP and levels',planner:()=>'Projections and what-ifs',settings:()=>'Backup, restore and preferences'};
+const SUBS={dashboard:()=>ymLabel(S.month)+' overview',transactions:()=>'Every dollar in and out',budgets:()=>'Your budget, tracked week by week',report:()=>'Where your money went in '+ymLabel(S.month,'m'),goals:()=>'Savings goals and progress',challenges:()=>'Badges, XP and levels',planner:()=>'Projections and what-ifs',settings:()=>'Backup, restore and preferences'};
 function navBtn(id){const [i,l]=VIEWS[id];return `<button data-act="nav" data-view="${id}" class="${S.view===id?'active':''}">${ic(i,18)}<span>${l}</span></button>`}
 function renderNav(){
-  $('#nav').innerHTML='<div class="navlab">Overview</div>'+['dashboard','transactions','budgets'].map(navBtn).join('')+'<div class="navlab">Planning</div>'+['goals','challenges','planner'].map(navBtn).join('');
+  $('#nav').innerHTML='<div class="navlab">Overview</div>'+['dashboard','transactions','budgets','report'].map(navBtn).join('')+'<div class="navlab">Planning</div>'+['goals','challenges','planner'].map(navBtn).join('');
   $('#navSettings').innerHTML=navBtn('settings');
-  const extra=['challenges','planner','settings'];
+  const extra=['report','challenges','planner','settings'];
   $('#bnav').innerHTML=['dashboard','transactions','budgets','goals'].map(id=>`<button data-act="nav" data-view="${id}" class="${S.view===id?'active':''}">${ic(VIEWS[id][0],20)}${VIEWS[id][1]}</button>`).join('')+`<button data-act="more" class="${extra.includes(S.view)?'active':''}" aria-label="More pages">${ic('more',20)}More</button>`;
   $('#msheet').innerHTML=extra.map(navBtn).join('');
 }
@@ -1894,6 +2042,9 @@ document.addEventListener('click',e=>{
   if(a==='nav'){S.view=el.dataset.view;if(S.view==='budgets')completeMission('budget');save();render();scrollTo({top:0})}
   else if(a==='add')openModal();
   else if(a==='closeModal')$('#modal').classList.remove('open');
+  else if(a==='report'){S.month=el.dataset.ym;S.view='report';S.flags.rpSeen=el.dataset.ym;save();render();scrollTo({top:0})}
+  else if(a==='rpPrint'){window.print()}
+  else if(a==='rpCopy'){const tx=reportText(S.month),ok=()=>toast('Summary copied','Paste it into a message or email','good');if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(tx).then(ok).catch(()=>toast('Could not copy','Your browser blocked the clipboard','bad'));else toast('Could not copy','Your browser blocked the clipboard','bad')}
   else if(a==='month'){S.month=shiftYM(S.month,+el.dataset.n);save();render()}
   else if(a==='bell'){const p=$('#npanel');p.classList.toggle('open');if(p.classList.contains('open'))renderNotifs()}
   else if(a==='readAll'){S.notifs.forEach(n=>n.read=true);save();renderTop()}
