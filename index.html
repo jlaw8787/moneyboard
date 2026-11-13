@@ -904,12 +904,44 @@ function periodRange(p){
   const label=p==='week'?'This week, '+short:p==='fortnight'?'Last two weeks, '+short:p==='month'?ymLabel(S.month):'Calendar year '+s.getFullYear();
   return {a:iso(s),b:iso(e),start:s,short,label,frac:clamp(el/len)};
 }
+/* Budget maths in one place.
+   Bills (rent, power, insurance, subscriptions, loans) are paid on a schedule, so they are kept out of
+   Safe to spend. A bill that comes round less often than the period you are looking at (monthly rent in
+   a weekly view, a quarterly power bill in a monthly view) is spread across its cycle. When it is actually
+   paid inside the period that is expected, so the payment, up to the bill amount, is not counted as overspending.
+   Spending in a category with no budget is never compared against a budget, it is shown on its own. */
+const CYCLE={daily:1/7,weekly:1,fortnightly:2,monthly:52/12,quarterly:13,yearly:52};
+const BILLCATS=new Set(['Housing','Utilities','Insurance','Subscriptions','Debt']);
+const isBill=c=>BILLCATS.has(c);
+function catBud(c,L,spent){
+  let reg=0,share=0,full=0;
+  S.items.forEach(it=>{if(it.cat!==c)return;const w=weekly(it),cy=CYCLE[it.freq]||CYCLE.monthly;if(cy>L*1.08){share+=w*L;full+=+it.amt||0}else reg+=Math.abs(cy-L)/L<.08?(+it.amt||0)*Math.max(1,Math.round(L/cy)):w*L});
+  const base=reg+share,extra=Math.min(Math.max(0,(spent||0)-base),Math.max(0,full-share));
+  return {b:base+extra,base,extra,bill:extra>.5};
+}
+function monthRange(ym){return {a:ym+'-01',b:ym+'-'+pad(daysIn(ym))}}
+function budView(r,L){
+  const sp=spentBy(r),bw=budgetsW(),cats={};let tB=0,tS=0,base=0,un=0,evB=0,evS=0,evBase=0,billW=0;
+  for(const c of new Set([...Object.keys(bw),...Object.keys(sp)])){if(isSave(c)||c==='Income')continue;const v=sp[c]||0;
+    if(!(bw[c]>0)){un+=v;continue}
+    const cb=catBud(c,L,v);cb.v=v;cats[c]=cb;tB+=cb.b;tS+=v;base+=cb.base;
+    if(isBill(c))billW+=bw[c];else{evB+=cb.b;evS+=v;evBase+=cb.base}}
+  return {sp,cats,tB,tS,base,extra:tB-base,un,evB,evS,evBase,billW};
+}
+function budStat(c,cb){const v=cb.v||0,b=cb.b;
+  if(isSave(c))return v>=b?['ok','Target hit','var(--accent)']:['ok','Saving','var(--accent)'];
+  if(v>b+.5)return ['bad','Over','var(--neg)'];
+  if(cb.bill)return ['ok','Bill paid','var(--accent)'];
+  if(isBill(c)&&b&&v/b>=.8)return ['ok','Paid','var(--accent)'];
+  return b&&v/b>=.8?['warn','Close','var(--warn)']:['ok','On track','var(--accent)'];
+}
+
 function spentBy(r){const o={};S.txns.forEach(t=>{if(t.type==='expense'&&t.date>=r.a&&t.date<=r.b)o[t.cat]=(o[t.cat]||0)+t.amount});return o}
 function goalSaved(){return S.goals.reduce((a,g)=>a+g.saved,0)}
 function level(){return Math.floor(S.xp/LEVEL_XP)+1}
 function levelTitle(l){return TITLES[Math.min(l-1,TITLES.length-1)]}
 function health(ym){
-  const t=totals(ym),cats=spendCats(),under=cats.filter(c=>(t.byCat[c]||0)<=BM()[c]).length;
+  const t=totals(ym),cats=spendCats(),under=cats.filter(c=>{const v=t.byCat[c]||0;return v<=catBud(c,daysIn(ym)/7,v).b+.5}).length;
   const g=S.goals.length?S.goals.reduce((a,x)=>a+clamp(x.saved/x.target),0)/S.goals.length:0;
   const parts={Savings:[clamp(t.rate/0.3)*40,40],Budgets:[(cats.length?under/cats.length:0)*35,35],Consistency:[clamp(streak()/7)*15,15],Goals:[g*10,10]};
   return {score:Math.round(Object.values(parts).reduce((a,p)=>a+p[0],0)),parts};
@@ -1007,9 +1039,9 @@ function notify(title,body,kind){S.notifs.unshift({id:uid(),title,body,kind:kind
 function checkAlerts(silent){
   const ym=curYM(),t=totals(ym);
   for(const c of spendCats()){
-    const b=BM()[c];if(!b)continue;const sp=t.byCat[c]||0,p=sp/b,k=ym+'|'+c;
-    if(p>=1&&!S.alerted[k+'|100']){S.alerted[k+'|100']=S.alerted[k+'|80']=1;notify(c+' is over budget',money(sp)+' spent of '+money(b),'bad');if(!silent)toast(c+' is over budget',money(sp)+' spent of '+money(b),'bad')}
-    else if(p>=.8&&p<1&&!S.alerted[k+'|80']){S.alerted[k+'|80']=1;notify(c+' at '+Math.round(p*100)+'% of budget',money(b-sp)+' left this month','warn');if(!silent)toast(c+' at '+Math.round(p*100)+'% of budget',money(b-sp)+' left this month','warn')}
+    const sp=t.byCat[c]||0,cb=catBud(c,daysIn(ym)/7,sp),b=cb.b;if(!b)continue;const p=sp/b,k=ym+'|'+c;
+    if(sp>b+.5&&!S.alerted[k+'|100']){S.alerted[k+'|100']=S.alerted[k+'|80']=1;notify(c+' is over budget',money(sp)+' spent of '+money(b),'bad');if(!silent)toast(c+' is over budget',money(sp)+' spent of '+money(b),'bad')}
+    else if(!cb.bill&&!isBill(c)&&p>=.8&&sp<=b+.5&&!S.alerted[k+'|80']){S.alerted[k+'|80']=1;notify(c+' at '+Math.round(p*100)+'% of budget',money(b-sp)+' left this month','warn');if(!silent)toast(c+' at '+Math.round(p*100)+'% of budget',money(b-sp)+' left this month','warn')}
   }
   checkBills(silent);checkReport();
 }
@@ -1130,8 +1162,8 @@ function insightsCard(ym){
     if(dnM)ins.push(['good','down',`<b>${esc(dnM[0])}</b> is down <b>${money(-dnM[1])}</b> on ${vsTxt}`]);
   }
   if(isCur&&cut>=3&&tA){
-    const proj=tA/cut*N,tb=totalBudget();
-    if(tb)ins.push([proj>tb?'bad':'good','trend',`On this pace you will spend about <b>${money(proj)}</b> in ${ymLabel(ym,'m')}, ${proj>tb?'<b>'+money(proj-tb)+' over</b>':'<b>'+money(tb-proj)+' under</b>'} your budget`]);
+    const MV=budView(monthRange(ym),N/7),tb=MV.tB,projB=Math.max(0,MV.tS-MV.extra)/cut*N+MV.extra,proj=tA/cut*N;
+    if(tb)ins.push([projB>tb+.5?'bad':'good','trend',`On this pace your budgeted categories will come to about <b>${money(projB)}</b> in ${ymLabel(ym,'m')}, ${projB>tb?'<b>'+money(projB-tb)+' over</b>':'<b>'+money(tb-projB)+' under</b>'} budget`]);
     else ins.push(['','trend',`On this pace you will spend about <b>${money(proj)}</b> in ${ymLabel(ym,'m')}`]);
   }
   if(tA){
@@ -1164,8 +1196,10 @@ V.dashboard=()=>{
   const ym=S.month,t=totals(ym),p=totals(shiftYM(ym,-1)),tb=totalBudget(),pm=ymLabel(shiftYM(ym,-1),'s');
   const H=health(ym),sc=H.score,scCol=sc>=70?'var(--accent)':sc>=50?'var(--gold)':'var(--neg)',scWord=sc>=85?'Excellent':sc>=70?'Strong':sc>=50?'Fair':'Needs attention';
   const N=daysIn(ym),isCur=ym===curYM(),lastDay=isCur?new Date().getDate():(ym<curYM()?N:0);
+  const MV=budView(monthRange(ym),N/7),tbE=MV.tB;
   const daily=Array(N).fill(0),dailyNet=Array(N).fill(0);
-  monthTx(ym).forEach(x=>{const i=+x.date.slice(8)-1;if(x.type==='transfer'||(x.type==='expense'&&isSave(x.cat)))return;if(x.type==='expense'){daily[i]+=x.amount;dailyNet[i]-=x.amount}else dailyNet[i]+=x.amount});
+  const onlyB=S.items.some(i=>i.cat!=='Income');
+  monthTx(ym).forEach(x=>{const i=+x.date.slice(8)-1;if(x.type==='transfer'||(x.type==='expense'&&isSave(x.cat)))return;if(x.type==='expense'){if(!onlyB||budgetsW()[x.cat]>0)daily[i]+=x.amount;dailyNet[i]-=x.amount}else dailyNet[i]+=x.amount});
   let cum=0;const cumA=daily.map(v=>cum+=v);let cn=0;const cumN=dailyNet.map(v=>cn+=v);
 
   // sparkline (cumulative net)
@@ -1175,10 +1209,10 @@ V.dashboard=()=>{
   const spark=lastDay?'<svg viewBox="0 0 '+sw+' '+(sh+4)+'" style="width:100%;height:auto;overflow:visible"><line x1="0" x2="'+sw+'" y1="'+sy(0)+'" y2="'+sy(0)+'" stroke="#e6e8ed" stroke-dasharray="3 4"/><path class="fadein" d="'+sp+'L'+sx(sn.length-1)+' '+sy(0)+'L0 '+sy(0)+'Z" fill="'+(t.net>=0?'#0e7a5c':'#c4463d')+'" fill-opacity=".08"/><path class="ln" d="'+sp+'" fill="none" stroke="'+(t.net>=0?'#0e7a5c':'#c4463d')+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="'+sx(sn.length-1)+'" cy="'+sy(sn[sn.length-1])+'" r="3.5" fill="#fff" stroke="'+(t.net>=0?'#0e7a5c':'#c4463d')+'" stroke-width="2" class="fadein"/></svg>':'';
 
   // pace chart
-  const W=640,Hh=210,L=44,mx=Math.max(tb,cum,1)*1.1,X=i=>L+(N>1?i/(N-1)*(W-L):0),Y=v=>Hh-v/mx*Hh;
+  const W=640,Hh=210,L=44,mx=Math.max(tbE,cum,1)*1.1,X=i=>L+(N>1?i/(N-1)*(W-L):0),Y=v=>Hh-v/mx*Hh;
   let path='';for(let i=0;i<lastDay;i++)path+=(i?'L':'M')+X(i).toFixed(1)+' '+Y(cumA[i]).toFixed(1);
   const area=lastDay?path+'L'+X(lastDay-1).toFixed(1)+' '+Hh+'L'+L+' '+Hh+'Z':'';
-  const paceNow=lastDay?tb*lastDay/N:0,spentNow=lastDay?cumA[lastDay-1]:0,diff=spentNow-paceNow;
+  const paceNow=lastDay?MV.base*lastDay/N+MV.extra:0,spentNow=lastDay?cumA[lastDay-1]:0,diff=spentNow-paceNow;
   const ticks=[0,.25,.5,.75,1].map(f=>'<line x1="'+L+'" x2="'+W+'" y1="'+Y(mx*f/1.1*1.1*f/f||0)+'" y2="'+Y(mx*f/1.1*1.1*f/f||0)+'"/>').join('');
   const gl=[0,.25,.5,.75,1].map(f=>{const v=mx*f;return '<line x1="'+L+'" x2="'+W+'" y1="'+Y(v)+'" y2="'+Y(v)+'" stroke="#eff1f4"/><text x="'+(L-8)+'" y="'+(Y(v)+4)+'" text-anchor="end">'+short(v)+'</text>'}).join('');
   const xl=[1,8,15,22,N].map(d=>'<text x="'+X(d-1)+'" y="'+(Hh+20)+'" text-anchor="middle">'+d+' '+ymLabel(ym,'s')+'</text>').join('');
@@ -1188,7 +1222,7 @@ V.dashboard=()=>{
   const segs=cats.map(([c,v])=>{const len=t.exp?v/t.exp*C:0,l=Math.max(len-2.5,0);const s='<circle class="seg" cx="75" cy="75" r="'+R+'" fill="none" stroke="'+(CATS[c]||CATS.Other).c+'" stroke-width="14" style="stroke-dasharray:0 '+C+'" data-dash="'+l+' '+(C-l)+'" stroke-dashoffset="'+(-off)+'" transform="rotate(-90 75 75)" data-tip="'+esc(c)+'|'+v+'"/>';off+=len;return s}).join('');
 
   // budgets
-  const bh=Object.keys(BM()).filter(c=>BM()[c]>0).map(c=>[c,(t.byCat[c]||0)/BM()[c]]).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const bh=Object.entries(MV.cats).map(([c,cb])=>[c,cb.b?cb.v/cb.b:0,cb]).sort((a,b)=>b[1]-a[1]).slice(0,5);
 
   // cash flow
   const months=[...Array(6)].map((_,i)=>shiftYM(ym,i-5)),mt=months.map(m=>totals(m)),cmx=Math.max(1,...mt.map(x=>Math.max(x.inc,x.exp)))*1.1;
@@ -1201,19 +1235,20 @@ V.dashboard=()=>{
   const recent=[...S.txns].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
   const l=level(),into=S.xp%LEVEL_XP;
 
-  const wr=periodRange('week'),wTot=sumSpend(spentBy(wr)),wb=sumSpend(budgetsW());
+  const wr=periodRange('week'),WV=budView(wr,1),evCats=new Set(Object.keys(WV.cats).filter(c=>!isBill(c))),wTot=WV.evS,wb=WV.evB;
+
   const wdays=[...Array(7)].map((_,i)=>{const d=new Date(wr.start);d.setDate(d.getDate()+i);return iso(d)}),todayIso=iso(new Date());
-  const wd=wdays.map(d=>S.txns.filter(x=>x.type==='expense'&&!isSave(x.cat)&&x.date===d).reduce((a,x)=>a+x.amount,0));
+  const wd=wdays.map(d=>S.txns.filter(x=>x.type==='expense'&&evCats.has(x.cat)&&x.date===d).reduce((a,x)=>a+x.amount,0));
   const WW=280,WH=110,bwid=24,wgap=(WW-7*bwid)/6,wmx=Math.max(wb/7*1.5,...wd,1),al=WH-(wb/7)/wmx*WH;
   const wbars=wd.map((v,i)=>{const x=i*(bwid+wgap),h=v/wmx*WH,fut=wdays[i]>todayIso,isT=wdays[i]===todayIso;return (fut?'<rect x="'+x+'" y="0" width="'+bwid+'" height="'+WH+'" rx="5" fill="#f5f6f8"/>':'')+'<rect class="growy" style="animation-delay:'+(i*.04)+'s" x="'+x+'" y="'+(WH-h)+'" width="'+bwid+'" height="'+h+'" rx="5" fill="'+(isT?'#0e7a5c':v>wb/7?'#e5aaa4':'#c9ced6')+'"><title>'+money(v,2)+'</title></rect><text x="'+(x+bwid/2)+'" y="'+(WH+16)+'" text-anchor="middle"'+(isT?' style="fill:#0d1117;font-weight:600"':'')+'>'+'MTWTFSS'[i]+'</text>'}).join('');
   const D=getDaily(),dn=MISSIONS.filter(m=>D.done[m.id]).length,hr=new Date().getHours(),greet=hr<12?'Good morning':hr<17?'Good afternoon':'Good evening';
   const logged=new Set(manual().map(x=>x.date)),last7=[...Array(7)].map((_,i)=>{const d=new Date();d.setDate(d.getDate()-6+i);return d});
   const safe=wb-wTot,stk=streak();
   const player=`<div class="player">
-    <div><div class="lab">${greet}. Safe to spend this week</div><div class="safe">${wb?count(Math.max(safe,0)):count(t.net)}</div>
-      <div class="sub">${wb?(safe>=0?'That is about <b style="color:#fff">'+money(safe/Math.max(1,7-((new Date().getDay()+6)%7)))+'</b> a day until Sunday':'You are '+money(-safe)+' over this week'):'Net saved this month. Run the budget setup for a weekly figure'}</div>
+    <div><div class="lab">${greet}. ${wb?'Safe to spend this week':'Net saved this month'}</div><div class="safe">${wb?count(Math.max(safe,0)):count(t.net)}</div>
+      <div class="sub">${wb?(safe>=0?'That is about <b style="color:#fff">'+money(safe/Math.max(1,7-((new Date().getDay()+6)%7)))+'</b> a day until Sunday':'You are '+money(-safe)+' over your everyday budget this week'):S.items.some(i=>i.cat!=='Income')?'Add everyday costs like groceries, fuel and eating out to your budget to see what is safe to spend each week':'Run the budget setup to see what is safe to spend each week'}</div>
       <div class="pbar" style="max-width:340px"><i data-w="${wb?(clamp(wTot/wb)*100).toFixed(1):0}" style="background:${wb&&wTot>wb?'#e5786d':'linear-gradient(90deg,#4fd1a5,#2fbf8f)'};box-shadow:none"></i></div>
-      <div class="sub" style="font-size:12px;color:rgba(255,255,255,.5)">${money(wTot)} of ${money(wb)} weekly budget used</div></div>
+      <div class="sub" style="font-size:12px;color:rgba(255,255,255,.5)">${wb?money(wTot)+' of '+money(wb)+' everyday budget used':'No everyday budget yet'}${WV.billW?' · Bills of '+money(WV.billW)+' a week are set aside':''}</div></div>
     <div class="sep"><div class="lab">Your level</div><div class="lvrow" style="margin-top:10px"><div class="lvchip">${l}</div><div style="min-width:0"><div style="font-weight:600;font-size:17px">${levelTitle(l)}</div><div class="sub" style="font-size:12.5px">${LEVEL_XP-into} XP to ${levelTitle(l+1)}</div></div></div>
       <div class="pbar"><i data-w="${(into/LEVEL_XP*100).toFixed(1)}"></i></div><div class="sub" style="font-size:12px;color:rgba(255,255,255,.5)">${into} / ${LEVEL_XP} XP · ${CHALLENGES.filter(c=>S.unlocked[c.id]).length} of ${CHALLENGES.length} badges</div></div>
     <div class="sep"><div class="lab">Logging streak</div><div style="display:flex;align-items:center;gap:8px;margin-top:8px"><span class="flame">${ic('flame',30,1.8)}</span><span style="font-size:30px;font-weight:600;letter-spacing:-.03em">${stk}</span><span class="sub">day${stk===1?'':'s'}</span></div>
@@ -1240,7 +1275,7 @@ V.dashboard=()=>{
     </div>
     <div class="kpis">
       <div class="kpi"><div class="eyebrow">Income</div><div class="v">${count(t.inc)}</div><div style="display:flex;gap:6px;align-items:center">${delta(t.inc,p.inc)}<span class="muted" style="font-size:12px">vs ${pm}</span></div><div style="margin-top:auto;padding-top:18px">${bar(p.inc?t.inc/Math.max(t.inc,p.inc):1,'var(--accent)')}</div><div class="cap">${p.inc?Math.round(t.inc/p.inc*100)+'% of last month':'First month tracked'}</div></div>
-      <div class="kpi"><div class="eyebrow">Spending</div><div class="v">${count(t.exp)}</div><div style="display:flex;gap:6px;align-items:center">${delta(t.exp,p.exp,true)}<span class="muted" style="font-size:12px">vs ${pm}</span></div><div style="margin-top:auto;padding-top:18px">${bar(tb?t.exp/tb:0,STATUS(tb?t.exp/tb:0)[2],null,isCur?lastDay/N:null)}</div><div class="cap">${tb?Math.round(t.exp/tb*100)+'% of '+money(tb)+' budget':'No budget set'}</div></div>
+      <div class="kpi"><div class="eyebrow">Spending</div><div class="v">${count(t.exp)}</div><div style="display:flex;gap:6px;align-items:center">${delta(t.exp,p.exp,true)}<span class="muted" style="font-size:12px">vs ${pm}</span></div><div style="margin-top:auto;padding-top:18px">${bar(tbE?MV.tS/tbE:0,STATUS(tbE&&MV.tS>tbE+.5?1:tbE?Math.min(MV.tS/tbE,.99):0)[2],null,isCur?lastDay/N:null)}</div><div class="cap">${tbE?Math.round(MV.tS/tbE*100)+'% of '+money(tbE)+' budgeted'+(MV.un?' · '+money(MV.un)+' not budgeted':''):'No budget set'}</div></div>
       <div class="kpi"><div class="eyebrow">Savings rate</div><div class="v ${t.rate<0?'neg':''}">${count(t.rate*100,'pct')}</div><div><span class="chip ${t.rate>=.2?'up':'nt'}">${t.rate>=.2?'Above target':'Target 20%'}</span></div><div style="margin-top:auto;padding-top:18px">${bar(t.rate/0.4,'var(--accent)',null,0.5)}</div><div class="cap">Marker shows the 20% target</div></div>
     </div>
   </div>
@@ -1248,21 +1283,21 @@ V.dashboard=()=>{
   ${billsCard()}
 
   <div class="grid w21">
-    <div class="card chart"><div class="ch"><h3>Spending pace</h3><span class="s">${lastDay&&(tb||spentNow)?(diff>0?'<span class="neg">'+money(diff)+' ahead of budget pace</span>':'<span class="pos">'+money(Math.abs(diff))+' under budget pace</span>'):'No data yet'}</span></div>
+    <div class="card chart"><div class="ch"><h3>Spending pace</h3><span class="s">${lastDay&&tbE?(diff>0?'<span class="neg">'+money(diff)+' ahead of budget pace</span>':'<span class="pos">'+money(Math.abs(diff))+' under budget pace</span>'):'No data yet'}</span></div>
       <svg viewBox="0 -8 ${W} ${Hh+32}">
         <defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0e7a5c" stop-opacity=".14"/><stop offset="1" stop-color="#0e7a5c" stop-opacity="0"/></linearGradient></defs>
         ${gl}
-        <line x1="${L}" y1="${Hh}" x2="${W}" y2="${Y(tb)}" stroke="#b7bdc7" stroke-width="1.5" stroke-dasharray="5 5"/>
+        <line x1="${L}" y1="${Y(MV.extra)}" x2="${W}" y2="${Y(tbE)}" stroke="#b7bdc7" stroke-width="1.5" stroke-dasharray="5 5"/>
         ${area?`<path class="fadein" d="${area}" fill="url(#ga)"/><path class="ln" d="${path}" fill="none" stroke="#0e7a5c" stroke-width="2" stroke-linejoin="round"/>`:''}
         ${lastDay&&isCur?`<line x1="${X(lastDay-1)}" x2="${X(lastDay-1)}" y1="${Y(spentNow)}" y2="${Hh}" stroke="#0e7a5c" stroke-opacity=".3" stroke-dasharray="2 3"/><circle class="fadein" cx="${X(lastDay-1)}" cy="${Y(spentNow)}" r="4.5" fill="#fff" stroke="#0e7a5c" stroke-width="2"/>`:''}
         ${xl}
       </svg>
-      <div class="legend" style="margin-top:12px"><span><i style="background:#0e7a5c"></i>Spent to date</span><span><i class="dash"></i>Even budget pace</span></div>
+      <div class="legend" style="margin-top:12px"><span><i style="background:#0e7a5c"></i>${onlyB&&MV.un?'Spent in budgeted categories':'Spent to date'}</span><span><i class="dash"></i>Even budget pace${MV.extra>.5?', bills paid added':''}</span></div>
     </div>
-    <div class="card chart"><div class="ch"><h3>This week</h3><span class="s">${wr.short}</span></div>
+    <div class="card chart"><div class="ch"><div><h3>This week</h3><div class="s" style="margin-top:2px">Everyday spending, bills left out</div></div><span class="s">${wr.short}</span></div>
       <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:10px"><span class="num" style="font-size:26px">${count(wTot)}</span><span class="muted">of ${money(wb)}</span></div>
       ${bar(wb?wTot/wb:0,STATUS(wb?wTot/wb:0)[2],6,wr.frac)}
-      <div class="muted" style="font-size:12.5px;margin:8px 0 16px">${wb?(wb-wTot>=0?money(wb-wTot)+' left for the rest of the week':'Over by '+money(wTot-wb)):'Run the budget setup to get a weekly budget'}</div>
+      <div class="muted" style="font-size:12.5px;margin:8px 0 16px">${wb?(wb-wTot>=0?money(wb-wTot)+' left for the rest of the week':'Over by '+money(wTot-wb)):'Add everyday costs to your budget to track your week'}${WV.un?'<br><span class="subtle">'+money(WV.un)+' spent in categories with no budget is not counted</span>':''}</div>
       <svg viewBox="0 -4 ${WW} ${WH+22}">${wbars}${wb?`<line x1="0" x2="${WW}" y1="${al}" y2="${al}" stroke="#b7bdc7" stroke-dasharray="4 4"/>`:''}</svg>
       <div class="legend" style="margin-top:8px"><span><i class="dash"></i>Daily allowance ${money(wb/7)}</span><span><i style="background:#0e7a5c"></i>Today</span></div>
     </div>
@@ -1276,7 +1311,7 @@ V.dashboard=()=>{
       <div class="lst">${cats.slice(0,6).map(([c,v])=>`<div class="lrow">${catChip(CATS[c]||CATS.Other,28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(c)}</div></div><span class="muted" style="font-size:12px;width:36px;text-align:right">${Math.round(v/t.exp*100)}%</span><span class="amt" style="width:72px;text-align:right">${money(v)}</span></div>`).join('')}</div></div>`:empty('pie','No spending logged this month')}
     </div>
     <div class="card"><div class="ch"><h3>Budgets</h3><button class="lnk" data-act="nav" data-view="budgets">Manage ${ic('chevR',14)}</button></div>
-      ${bh.map(([c,pc])=>{const s=STAT(c,pc);return `<div class="lrow" style="flex-wrap:wrap">${catChip(CATS[c],28)}<div class="grow"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px"><span class="nm" style="font-size:13px">${c}</span><span style="font-size:12.5px"><span class="amt">${money(t.byCat[c]||0)}</span> <span class="subtle">/ ${money(BM()[c])}</span></span></div>${bar(pc,s[2],5)}</div><span class="pill ${s[0]}" style="width:66px;justify-content:center">${s[1]}</span></div>`}).join('')||'<div class="empty">'+ic('pie',28,1.5)+'No budget yet<div style="margin-top:12px"><button class="btn pri sm" data-act="wizOpen">Start budget setup</button></div></div>'}
+      ${bh.map(([c,pc,cb])=>{const s=budStat(c,cb);return `<div class="lrow" style="flex-wrap:wrap">${catChip(CATS[c],28)}<div class="grow"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px"><span class="nm" style="font-size:13px">${c}</span><span style="font-size:12.5px"><span class="amt">${money(cb.v)}</span> <span class="subtle">/ ${money(cb.b)}</span></span></div>${bar(pc,s[2],5)}</div><span class="pill ${s[0]}" style="width:66px;justify-content:center">${s[1]}</span></div>`}).join('')||'<div class="empty">'+ic('pie',28,1.5)+'No budget yet<div style="margin-top:12px"><button class="btn pri sm" data-act="wizOpen">Start budget setup</button></div></div>'}
     </div>
   </div>
 
@@ -1347,7 +1382,8 @@ let OPEN=new Set();
 V.budgets=()=>{
   const pk=S.period||'week',per=PERIODS[pk],f=per[2],bw=budgetsW(),inW=incomeW(),exW=sum(bw);
   const rng=periodRange(pk),sp=spentBy(rng),cats=Object.keys(CATS).filter(c=>bw[c]>0||sp[c]>0);
-  const tB=sumSpend(bw)*f,tS=cats.reduce((a,c)=>isSave(c)?a:a+(sp[c]||0),0),st=STATUS(tB?tS/tB:0),inc=S.items.filter(x=>x.cat==='Income');
+  const Lw=pk==='month'?daysIn(S.month)/7:f,BV=budView(rng,Lw);
+  const tB=BV.tB,tS=BV.tS,st=tB&&tS>tB+.5?STATUS(1):STATUS(tB?Math.min(tS/tB,.99):0),inc=S.items.filter(x=>x.cat==='Income');
   if(!S.items.length)return `<div class="card" style="text-align:center;padding:56px 24px"><span class="cat" style="width:56px;height:56px;margin:0 auto 16px;background:var(--accent-soft);color:var(--accent)">${ic('spark',26)}</span><h2 style="font-size:20px;font-weight:600;color:var(--ink);letter-spacing:-.02em">Build your budget in a few minutes</h2><p class="muted" style="max-width:440px;margin:8px auto 20px">We will step through ${WIZ.length} common costs, from mortgage and insurance to school fees and subscriptions. Enter each one however you pay it and we will convert everything to a weekly figure.</p><button class="btn pri" data-act="wizOpen">${ic('arrowR',16)}Start budget setup</button><div style="margin-top:10px"><button class="lnk" data-act="itemNew">or add a single item</button></div></div>`;
   const wAt=S.flags.wizAt||0;
   return `
@@ -1367,8 +1403,9 @@ V.budgets=()=>{
     <div class="ch"><h3>Tracking</h3><span class="s">${rng.label}</span></div>${bw.Savings||sp.Savings?'<div class="muted" style="font-size:12.5px;margin:-8px 0 12px">Savings are tracked as their own row and left out of the spending total.</div>':''}
     <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px;flex-wrap:wrap"><span class="num" style="font-size:22px">${money(tS)}</span><span class="muted">spent of ${money(tB)} budgeted</span><span style="margin-left:auto"><span class="pill ${st[0]}">${st[1]}</span></span></div>
     ${bar(tB?tS/tB:0,st[2],8,rng.frac<1?rng.frac:null)}
+    ${BV.un>.5||BV.extra>.5?`<div class="muted" style="font-size:12.5px;margin-top:8px">${BV.extra>.5?'Includes '+money(BV.extra)+' of bills that fell due in this period. ':''}${BV.un>.5?money(BV.un)+' spent in categories with no budget is shown below but not counted.':''}</div>`:''}
     <div class="brow hd" style="margin-top:22px"><span>Category</span><span>Progress</span><span class="r sp">Spent</span><span class="r">Budget</span><span class="r lf">Remaining</span><span class="st">Status</span></div>
-    ${cats.map(c=>{const b=(bw[c]||0)*f,v=sp[c]||0,pc=b?v/b:(v?1:0),stt=STAT(c,pc),sv=isSave(c),its=S.items.filter(x=>x.cat===c),open=OPEN.has(c);return `
+    ${cats.map(c=>{const cb=bw[c]>0?(BV.cats[c]||Object.assign(catBud(c,Lw,sp[c]||0),{v:sp[c]||0})):null,b=cb?cb.b:0,v=sp[c]||0,pc=b?v/b:(v?1:0),stt=cb?budStat(c,cb):STAT(c,pc),sv=isSave(c),its=S.items.filter(x=>x.cat===c),open=OPEN.has(c);return `
     <div class="brow clk" data-act="toggleCat" data-cat="${esc(c)}"><span class="nm"><span class="chev ${open?'o':''}">${ic('chevR',14)}</span>${catChip(CATS[c])}<span>${esc(c)}<span class="subtle" style="display:block;font-size:12px;font-weight:400">${its.length} item${its.length===1?'':'s'}</span></span></span>
       <span class="bb">${bar(pc,b?stt[2]:'#c9ced6',6,rng.frac<1?rng.frac:null)}</span><span class="r sp amt">${money(v)}</span><span class="r amt">${b?money(b):'<span class="subtle">None</span>'}</span>
       <span class="r lf ${sv?(b&&v>=b?'pos':'muted'):b&&v>b?'neg':'muted'}">${b?(sv?(v>=b?'Done':money(b-v)+' to go'):v<=b?money(b-v):'-'+money(v-b)):''}</span><span class="st">${b?`<span class="pill ${stt[0]}">${stt[1]}</span>`:'<span class="pill nt">Not budgeted</span>'}</span></div>
@@ -1519,15 +1556,15 @@ function reportData(ym){
   const prevSpend=monthTx(pv).filter(x=>x.type==='expense'&&!isSave(x.cat)&&+x.date.slice(8)<=pcut);
   const pc={};prevSpend.forEach(x=>pc[x.cat]=(pc[x.cat]||0)+x.amount);
   const cc={};spend.forEach(x=>cc[x.cat]=(cc[x.cat]||0)+x.amount);
-  const bm=BM();
-  const cats=[...new Set([...Object.keys(cc),...Object.keys(pc)])].map(c=>({c,a:cc[c]||0,b:pc[c]||0,bud:bm[c]||0})).sort((x,y)=>y.a-x.a||y.b-x.b);
+  const MV=budView(monthRange(ym),N/7);
+  const cats=[...new Set([...Object.keys(cc),...Object.keys(pc)])].map(c=>({c,a:cc[c]||0,b:pc[c]||0,bud:MV.cats[c]?MV.cats[c].b:0,cb:MV.cats[c]})).sort((x,y)=>y.a-x.a||y.b-x.b);
   const merch=groupBy(spend,x=>(x.src==='bank'?suggestKey(x.note):normNote(x.note))||'('+x.cat+')').map(m=>{const t0=m.items[0];return Object.assign(m,{name:m.k[0]==='('?m.k.slice(1,-1):t0.src==='bank'?titleCase(m.k):t0.note.trim(),cat:topCat(m.items)})});
   const big=[...spend].sort((a,b)=>b.amount-a.amount).slice(0,5);
   const incSrc=groupBy(ins,x=>x.cat);
   const wk=[];for(let s=1;s<=N;s+=7){const e=Math.min(s+6,N);wk.push({s,e,v:spend.filter(x=>{const d=+x.date.slice(8);return d>=s&&d<=e}).reduce((a,x)=>a+x.amount,0),future:isCur&&s>cut})}
   const accts=[...new Set(tx.map(x=>x.acct).filter(Boolean))].sort().map(a=>{const l=tx.filter(x=>x.acct===a),s=f=>l.filter(f).reduce((q,x)=>q+x.amount,0);return {a,inc:s(x=>x.type==='income'),out:s(x=>x.type==='expense'),xin:s(x=>x.type==='transfer'&&x.dir==='in'),xout:s(x=>x.type==='transfer'&&x.dir!=='in')}});
   const moved=xf.filter(x=>x.dir!=='in').reduce((a,x)=>a+x.amount,0);
-  return {ym,pv,N,isCur,cut,tx,spend,saves,ins,xf,T,P,PF,cats,merch,big,incSrc,wk,accts,moved,savTot:saves.reduce((a,x)=>a+x.amount,0),tb:totalBudget()};
+  return {ym,pv,N,isCur,cut,tx,spend,saves,ins,xf,T,P,PF,cats,merch,big,incSrc,wk,accts,moved,savTot:saves.reduce((a,x)=>a+x.amount,0),tb:MV.tB,MV};
 }
 function reportPoints(R){
   const pm=ymLabel(R.pv,'s'),mm=ymLabel(R.ym,'m'),vs=R.isCur?'the same point in '+pm:pm,pts=[],{T,P}=R;
@@ -1538,9 +1575,11 @@ function reportPoints(R){
     if(up)pts.push(['bad','up',`<b>${esc(up[0])}</b> went up the most, <b>${money(up[1])}</b> more than ${vs}`]);
     if(dn)pts.push(['good','down',`<b>${esc(dn[0])}</b> came down the most, <b>${money(-dn[1])}</b> less than ${vs}`]);}
   if(R.tb){
-    if(R.isCur){const pace=R.tb*R.cut/R.N,d=T.exp-pace;pts.push([d>0?'bad':'good','trend',`You are <b>${money(Math.abs(d))} ${d>0?'over':'under'}</b> an even budget pace for day ${R.cut}`])}
-    else{const d=T.exp-R.tb;pts.push([d>0?'bad':'good','trend',d>0?`You went <b>${money(d)} over</b> your ${money(R.tb)} monthly budget`:`You came in <b>${money(-d)} under</b> your ${money(R.tb)} monthly budget`])}
-    const over=R.cats.filter(c=>c.bud&&c.a>c.bud).map(c=>c.c);
+    const M=R.MV,bs=M.tS;
+    if(R.isCur){const pace=M.base*R.cut/R.N+M.extra,d=bs-pace;pts.push([d>0?'bad':'good','trend',`Your budgeted categories are <b>${money(Math.abs(d))} ${d>0?'over':'under'}</b> an even pace for day ${R.cut}${M.extra>.5?', counting bills already paid':''}`])}
+    else{const d=bs-R.tb;pts.push([d>0?'bad':'good','trend',d>0?`You went <b>${money(d)} over</b> your ${money(R.tb)} monthly budget`:`You came in <b>${money(-d)} under</b> your ${money(R.tb)} monthly budget`])}
+    const over=R.cats.filter(c=>c.bud&&c.a>c.bud+.5).map(c=>c.c);
+    if(M.un>.5)pts.push(['','info',`<b>${money(M.un)}</b> went on categories with no budget, so it is not compared against anything`]);
     if(over.length)pts.push(['bad','alert',`${over.length} categor${over.length>1?'ies':'y'} went over budget: <b>${over.map(esc).join(', ')}</b>`]);
   }
   const m1=R.merch.find(m=>m.k[0]!=='(');
@@ -1605,7 +1644,7 @@ V.report=()=>{
 
   <div class="card" style="margin-bottom:16px"><div class="ch"><h3>Spending by category</h3><span class="s">${money(T.exp)} total</span></div>
     ${R.cats.length?`<table class="table rpcats"><thead><tr><th>Category</th><th class="r">${mm}</th><th class="r hm">${pm}</th><th class="r">Change</th><th class="r hm">Budget used</th></tr></thead><tbody>
-    ${R.cats.map(c=>{const pc=c.bud?c.a/c.bud:0,s=STAT(c.c,pc);return `<tr><td><div class="desc">${catChip(catOf(c.c),28)}<div style="flex:1;min-width:0"><b>${esc(c.c)}</b>${bar(c.a/catMax,catOf(c.c).c,4)}</div></div></td><td class="r"><span class="amt">${money(c.a)}</span></td><td class="r hm muted">${money(c.b)}</td><td class="r">${chg(c.a,c.b)}</td><td class="r hm">${c.bud?`<span class="pill ${s[0]}">${Math.round(pc*100)}% of ${money(c.bud)}</span>`:'<span class="subtle">No budget</span>'}</td></tr>`}).join('')}
+    ${R.cats.map(c=>{const pc=c.bud?c.a/c.bud:0,s=c.cb?budStat(c.c,Object.assign({},c.cb,{v:c.a})):STAT(c.c,pc);return `<tr><td><div class="desc">${catChip(catOf(c.c),28)}<div style="flex:1;min-width:0"><b>${esc(c.c)}</b>${bar(c.a/catMax,catOf(c.c).c,4)}</div></div></td><td class="r"><span class="amt">${money(c.a)}</span></td><td class="r hm muted">${money(c.b)}</td><td class="r">${chg(c.a,c.b)}</td><td class="r hm">${c.bud?`<span class="pill ${s[0]}">${Math.round(pc*100)}% of ${money(c.bud)}</span>`:'<span class="subtle">No budget</span>'}</td></tr>`}).join('')}
     </tbody></table>`:empty('pie','No spending this month')}
   </div>
 
