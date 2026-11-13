@@ -101,6 +101,8 @@ Deno.serve(async (req) => {
       const due: { key: string; name: string; amt: number; date: string }[] = [];
       for (const r of d.recurring || []) {
         if (r.type !== "expense" || !r.next) continue;
+        // Bills shared from your own personal board already remind you there
+        if (bd.scope && r.from?.u === uid) continue;
         let x = r.next, g = 0;
         while (x <= end && g < 60) {
           if (x >= today) due.push({ key: bd.scope + r.id + "|" + x, name: r.note || r.cat, amt: +r.amount || 0, date: x });

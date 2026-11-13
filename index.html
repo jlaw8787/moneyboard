@@ -235,6 +235,11 @@ select.inp{padding-right:30px;appearance:none;background-image:url("data:image/s
 .goal .gx{position:absolute;top:16px;right:16px;color:var(--subtle);width:28px;height:28px;border-radius:7px;display:grid;place-items:center;font-size:12px}
 .goal .gx:hover{color:var(--neg);background:var(--neg-soft)}
 .goal .gm{display:flex;align-items:center;gap:18px;margin:20px 0}
+.shline{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:10px}
+button.shline{font-weight:500}
+.shfield{margin-top:12px}
+.shhint{font-size:12px;color:var(--subtle);font-weight:400}
+.jasel{width:auto;max-width:170px;height:32px;font-size:12.5px}
 .ring{position:relative;flex:none}
 .ring svg{transform:rotate(-90deg)}
 .ring .c{position:absolute;inset:0;display:grid;place-items:center;font-weight:600;color:var(--ink);letter-spacing:-.02em}
@@ -549,6 +554,7 @@ select.inp{padding-right:30px;appearance:none;background-image:url("data:image/s
         <label class="field">Note<input class="inp" id="fNote" type="text" maxlength="60" placeholder="Optional"></label>
       </div>
       <label class="field" id="fRepRow" style="margin-top:12px">Repeats<select class="inp" id="fRepeat"><option value="none">Does not repeat</option><option value="weekly">Every week</option><option value="fortnightly">Every fortnight</option><option value="monthly">Every month</option><option value="quarterly">Every quarter</option><option value="yearly">Every year</option></select></label>
+      <div id="fShareRow"></div>
       <div class="recnote" id="fInfo" style="display:none"></div>
       <div class="recnote" id="fRuleRow" style="display:none"><label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-weight:500;cursor:pointer"><input type="checkbox" id="fRuleOn" style="accent-color:var(--accent);width:16px;height:16px">Remember this for future imports</label><div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap"><span>Match notes containing</span><input class="inp" id="fRuleKey" maxlength="40" style="height:30px;flex:1;min-width:120px;font-size:13px"></div></div>
       <div class="row2" style="margin-top:20px">
@@ -895,7 +901,7 @@ function runRecurring(){
 function recurringNotice(n,quiet){if(!n)return;const b='Repeating items were added on their due dates';notify(n+' repeating transaction'+(n>1?'s':'')+' logged',b,'info');if(!quiet)toast(n+' repeating transaction'+(n>1?'s':'')+' logged',b,'info')}
 function delTx(id){
   const t=S.txns.find(x=>x.id===id);if(!t)return null;
-  if(t.goal){const g=S.goals.find(x=>x.id===t.goal);if(g)g.saved=Math.max(0,Math.round((g.saved-t.amount)*100)/100)}
+  if(t.goal){const g=S.goals.find(x=>x.id===t.goal);if(g){g.saved=Math.max(0,Math.round((g.saved-t.amount)*100)/100);if(g.from)g.extra=Math.max(0,Math.round(((+g.extra||0)-t.amount)*100)/100)}}
   S.txns=S.txns.filter(x=>x.id!==id);return t;
 }
 
@@ -1256,7 +1262,7 @@ V.dashboard=()=>{
 };
 
 function txTable(list,del){
-  return `<table class="table"><thead><tr><th>Description</th><th class="hm">Category</th><th class="hm">Date</th><th class="r">Amount</th>${del?'<th style="width:36px"></th>':''}</tr></thead><tbody>${list.map(t=>{const ci=catInfo(t),inc=t.type==='income';const xf=t.type==='transfer';return `<tr class="clk" data-act="txEdit" data-id="${t.id}"><td><div class="desc">${catChip(ci)}<div><b>${esc(t.note||t.cat)}</b><div class="muted" style="font-size:12px">${t.goal?'Saved to goal':xf?'Transfer':t.auto?'Repeating':inc?'Income':'Expense'}</div></div></div></td><td class="hm"><span class="pill nt">${esc(t.cat)}</span></td><td class="hm muted">${dLabel(t.date)}</td><td class="r"><span class="amt ${inc?'in':''}" ${xf?'style="color:var(--muted)"':''}>${xf?'':inc?'+':'-'}${money(t.amount,2)}</span></td>${del?`<td class="r"><button class="del" data-act="delTx" data-id="${t.id}" aria-label="Delete">${ic('trash',15)}</button></td>`:''}</tr>`}).join('')}</tbody></table>`;
+  return `<table class="table"><thead><tr><th>Description</th><th class="hm">Category</th><th class="hm">Date</th><th class="r">Amount</th>${del?'<th style="width:36px"></th>':''}</tr></thead><tbody>${list.map(t=>{const ci=catInfo(t),inc=t.type==='income';const xf=t.type==='transfer';return `<tr class="clk" data-act="txEdit" data-id="${t.id}"><td><div class="desc">${catChip(ci)}<div><b>${esc(t.note||t.cat)}</b><div class="muted" style="font-size:12px">${t.goal?'Saved to goal':xf?'Transfer':t.auto?'Repeating':inc?'Income':'Expense'}${shTag('txns',t)}</div></div></div></td><td class="hm"><span class="pill nt">${esc(t.cat)}</span></td><td class="hm muted">${dLabel(t.date)}</td><td class="r"><span class="amt ${inc?'in':''}" ${xf?'style="color:var(--muted)"':''}>${xf?'':inc?'+':'-'}${money(t.amount,2)}</span></td>${del?`<td class="r">${BOARD&&t.from?`<span class="subtle" title="Shared from a personal board">${ic('users',15)}</span>`:`<button class="del" data-act="delTx" data-id="${t.id}" aria-label="Delete">${ic('trash',15)}</button>`}</td>`:''}</tr>`}).join('')}</tbody></table>`;
 }
 
 let F={q:'',type:'all',cat:'all'};
@@ -1274,7 +1280,7 @@ V.transactions=()=>`
 function recCard(){
   const R=[...(S.recurring||[])].sort((a,b)=>a.next.localeCompare(b.next)),FL={weekly:'week',fortnightly:'fortnight',monthly:'month',quarterly:'quarter',yearly:'year'};
   return `<div class="card" style="margin-top:16px"><div class="ch"><div><h3>Recurring</h3><div class="s" style="margin-top:2px">Logged for you on each due date</div></div><button class="btn sec sm" data-act="recNew">${ic('plus',14,2)}Add repeating item</button></div>
-  ${R.length?R.map(r=>{const ci=r.type==='transfer'?XFER:r.type==='income'?(INCATS[r.cat]||INCATS['Other income']):(CATS[r.cat]||CATS.Other);return `<div class="lrow">${catChip(ci)}<div class="grow"><div class="nm">${esc(r.note||r.cat)}</div><div class="sb">Every ${FL[r.freq]} · next on ${dLabel(r.next)}</div></div><span class="amt ${r.type==='income'?'in':''}">${r.type==='income'?'+':r.type==='transfer'?'':'-'}${money(r.amount,2)}</span><button class="del" style="opacity:1" data-act="recEdit" data-id="${r.id}" aria-label="Edit">${ic('edit',14)}</button><button class="del" style="opacity:1" data-act="recDel" data-id="${r.id}" aria-label="Stop repeating">${ic('trash',14)}</button></div>`}).join(''):empty('repeat','Nothing repeating yet. Choose how often it repeats when you add rent, pay or a subscription.')}
+  ${R.length?R.map(r=>{const ci=r.type==='transfer'?XFER:r.type==='income'?(INCATS[r.cat]||INCATS['Other income']):(CATS[r.cat]||CATS.Other);return `<div class="lrow">${catChip(ci)}<div class="grow"><div class="nm">${esc(r.note||r.cat)}</div><div class="sb">Every ${FL[r.freq]} · next on ${dLabel(r.next)}${shTag('recurring',r)}</div></div><span class="amt ${r.type==='income'?'in':''}">${r.type==='income'?'+':r.type==='transfer'?'':'-'}${money(r.amount,2)}</span>${BOARD&&r.from?lockBtn(r):`<button class="del" style="opacity:1" data-act="recEdit" data-id="${r.id}" aria-label="Edit">${ic('edit',14)}</button><button class="del" style="opacity:1" data-act="recDel" data-id="${r.id}" aria-label="Stop repeating">${ic('trash',14)}</button>`}</div>`}).join(''):empty('repeat','Nothing repeating yet. Choose how often it repeats when you add rent, pay or a subscription.')}
   </div>`;
 }
 function renderTxList(){
@@ -1317,7 +1323,7 @@ V.budgets=()=>{
     ${inc.map(itemRow).join('')||empty('wallet','No income added yet')}
   </div>`;
 };
-function itemRow(it){const P_=PERIODS[S.period||'week'];return `<div class="irow"><span class="grow"><span class="nm">${esc(it.name)}</span><span class="sb">${money(it.amt,2)} ${FREQ[it.freq][0].toLowerCase()}</span></span><span class="amt">${money(weekly(it)*P_[2],2)}<span class="subtle" style="font-weight:400"> / ${P_[1]}</span></span><button class="del" style="opacity:1" data-act="itemEdit" data-id="${it.id}" aria-label="Edit">${ic('edit',14)}</button><button class="del" style="opacity:1" data-act="itemDel" data-id="${it.id}" aria-label="Delete">${ic('trash',14)}</button></div>`}
+function itemRow(it){const P_=PERIODS[S.period||'week'];return `<div class="irow"><span class="grow"><span class="nm">${esc(it.name)}</span><span class="sb">${money(it.amt,2)} ${FREQ[it.freq][0].toLowerCase()}${shTag('items',it)}</span></span><span class="amt">${money(weekly(it)*P_[2],2)}<span class="subtle" style="font-weight:400"> / ${P_[1]}</span></span>${BOARD&&it.from?lockBtn(it):`<button class="del" style="opacity:1" data-act="itemEdit" data-id="${it.id}" aria-label="Edit">${ic('edit',14)}</button><button class="del" style="opacity:1" data-act="itemDel" data-id="${it.id}" aria-label="Delete">${ic('trash',14)}</button>`}</div>`}
 
 V.goals=()=>{
   const total=goalSaved(),target=S.goals.reduce((a,g)=>a+g.target,0);
@@ -1329,8 +1335,8 @@ V.goals=()=>{
   </div>
   <div class="grid c3">
     ${S.goals.map(g=>{const p=clamp(g.saved/g.target),done=p>=1;return `
-    <div class="card goal ${done?'done':''}"><button class="gx" data-act="delGoal" data-id="${g.id}" aria-label="Delete goal">${ic('x',14)}</button>
-      <div class="gh"><span class="cat" style="width:38px;height:38px;background:${g.color}14;color:${g.color}">${ic(g.icon,18)}</span><div><b>${esc(g.name)}</b><span class="muted" style="font-size:12.5px">${done?'Fully funded':money(g.target-g.saved)+' to go'}</span></div></div>
+    <div class="card goal ${done?'done':''}">${BOARD&&g.from?'':`<button class="gx" data-act="delGoal" data-id="${g.id}" aria-label="Delete goal">${ic('x',14)}</button>`}
+      <div class="gh"><span class="cat" style="width:38px;height:38px;background:${g.color}14;color:${g.color}">${ic(g.icon,18)}</span><div><b>${esc(g.name)}</b><span class="muted" style="font-size:12.5px">${done?'Fully funded':money(g.target-g.saved)+' to go'}</span></div></div>${goalShareLine(g)}
       <div class="gm"><div class="ring" style="width:84px;height:84px">${ring(p,84,g.color,7)}<div class="c" style="font-size:17px">${Math.round(p*100)}%</div></div>
         <div><div class="num" style="font-size:22px">${money(g.saved)}</div><div class="muted" style="font-size:12.5px">of ${money(g.target)}</div></div></div>
       ${done?'<span class="pill ok" style="align-self:flex-start">'+ic('check',12,2.2)+'&nbsp;Goal reached</span>':`<div class="chips">${[50,100,250,500].map(a=>`<button class="btn sec sm" data-act="contrib" data-id="${g.id}" data-amt="${a}">+${money(a)}</button>`).join('')}</div>
@@ -1340,6 +1346,7 @@ V.goals=()=>{
       <form id="goalForm" style="display:flex;flex-direction:column;gap:12px">
         <label class="field">Name<input class="inp" id="gName" required maxlength="40" placeholder="Holiday, house deposit, new laptop"></label>
         <div class="row2"><label class="field">Target<input class="inp" id="gTarget" type="number" min="1" required placeholder="5000"></label><label class="field">Saved so far<input class="inp" id="gSaved" type="number" min="0" placeholder="0"></label></div>
+        ${shareField('gShare','')}
         <div class="field">Icon<div class="icopick" id="gIcon">${GOAL_ICONS.map((n,i)=>`<button type="button" class="${i?'':'on'}" data-i="${n}" aria-label="${n}">${ic(n,17)}</button>`).join('')}</div></div>
         <button class="btn pri" type="submit">${ic('plus',16,2)}Create goal</button>
       </form>
@@ -1627,6 +1634,7 @@ function openModal(mode,id){
   $('#mTitle').textContent=mode==='edit'?'Edit transaction':mode==='rule'?'Edit repeating item':'New transaction';
   $('#fRepRow').style.display=mode==='edit'?'none':'';$('#fRepeat').querySelector('[value="none"]').hidden=mode==='rule';$('#fRepeat').value=mode==='rule'?t.freq:'none';
   const info=mode==='edit'&&t.goal?'This came from a savings goal. Changing the amount updates the goal too.':mode==='edit'&&t.auto?'Logged automatically from a repeating item. To change future ones, edit it under Recurring on the Transactions page.':mode==='rule'?'Changes apply from the next date onwards. Transactions already logged stay as they are.':'';
+  $('#fShareRow').innerHTML=shareField('fShare',mode==='edit'?shOf('txns',t):mode==='rule'?shOf('recurring',t):'',mode==='edit'&&t.rec&&shInherit(t)?'Its repeating item is shared, so this follows it unless you change it here.':mode==='rule'?'Every transaction this logs goes across too, and the joint board gets the bill reminders.':'');
   $('#fInfo').textContent=info;$('#fInfo').style.display=info?'':'none';
   $('#fDelWrap').style.display=mode==='new'?'none':'';$('#fDel').textContent=mode==='rule'?'Stop repeating':'Delete transaction';
   MM.bank=!!(t&&t.src==='bank');const showRule=mode==='edit'&&!!(t.note||'').trim()&&!t.goal;$('#fRuleRow').style.display=showRule?'':'none';$('#fRuleOn').checked=false;
@@ -1647,27 +1655,28 @@ function ruleNudge(){if(MM.mode==='edit'&&MM.bank&&$('#fRuleRow').style.display!
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')$('#modal').classList.remove('open')});
 $('#txForm').addEventListener('submit',e=>{
   e.preventDefault();const amt=Math.round(parseFloat($('#fAmount').value)*100)/100;if(!(amt>0))return;
-  const date=$('#fDate').value||iso(new Date()),note=$('#fNote').value.trim(),rep=$('#fRepeat').value;
+  const date=$('#fDate').value||iso(new Date()),note=$('#fNote').value.trim(),rep=$('#fRepeat').value,shEl=$('#fShare'),shv=shEl?shEl.value:null;
   if(MM.mode==='edit'){
     const t=S.txns.find(x=>x.id===MM.id);if(!t)return;
-    if(t.goal){const g=S.goals.find(x=>x.id===t.goal),keep=fType==='expense'&&fCat==='Savings';if(g)g.saved=Math.max(0,Math.round((g.saved+(keep?amt:0)-t.amount)*100)/100);if(!keep)delete t.goal}
-    Object.assign(t,{type:fType,amount:amt,cat:fCat,date,note});$('#modal').classList.remove('open');
+    if(t.goal){const g=S.goals.find(x=>x.id===t.goal),keep=fType==='expense'&&fCat==='Savings';if(g){const d=(keep?amt:0)-t.amount;g.saved=Math.max(0,Math.round((g.saved+d)*100)/100);if(g.from)g.extra=Math.max(0,Math.round(((+g.extra||0)+d)*100)/100)}if(!keep)delete t.goal}
+    Object.assign(t,{type:fType,amount:amt,cat:fCat,date,note});if(shv!==null)setSh('txns',t,shv);$('#modal').classList.remove('open');
     const key=normNote($('#fRuleKey').value);
     if($('#fRuleRow').style.display!=='none'&&$('#fRuleOn').checked&&key){
       S.rules=(S.rules||[]).filter(r=>r.match!==key);S.rules.push({id:uid(),match:key,type:fType,cat:fCat});
-      let n=0;S.txns.forEach(x=>{if(x!==t&&x.src==='bank'&&!x.goal&&matchKey(x.note,key)&&(fType==='transfer'||x.type===fType)&&(x.cat!==fCat||x.type!==fType)){x.type=fType;x.cat=fCat;n++}});
+      let n=0;S.txns.forEach(x=>{if(x!==t&&x.src==='bank'&&!x.goal&&!x.from&&matchKey(x.note,key)&&(fType==='transfer'||x.type===fType)&&(x.cat!==fCat||x.type!==fType)){x.type=fType;x.cat=fCat;n++}});
       toast('Saved and remembered','"'+key+'" will go to '+fCat+(n?'. Updated '+n+' other transaction'+(n>1?'s':''):''),'good');
     } else toast('Transaction updated',money(amt,2)+' · '+t.cat,'good');
     commit();return;
   }
   if(MM.mode==='rule'){
     const r=S.recurring.find(x=>x.id===MM.id);if(!r)return;
-    Object.assign(r,{type:fType,amount:amt,cat:fCat,note,freq:rep==='none'?r.freq:rep,next:date,day:+date.slice(8)});
+    Object.assign(r,{type:fType,amount:amt,cat:fCat,note,freq:rep==='none'?r.freq:rep,next:date,day:+date.slice(8)});if(shv!==null)setSh('recurring',r,shv);
     $('#modal').classList.remove('open');recurringNotice(runRecurring());toast('Repeating item updated',(note||fCat)+', next on '+dLabel(r.next),'good');commit();return;
   }
   const t={id:uid(),date,type:fType,amount:amt,cat:fCat,note};
   S.txns.push(t);$('#modal').classList.remove('open');
-  if(rep!=='none'){const r={id:uid(),type:fType,amount:amt,cat:fCat,note,freq:rep,day:+date.slice(8)};r.next=nextDate(date,rep,r.day);t.rec=r.id;S.recurring.push(r);recurringNotice(runRecurring())}
+  if(rep!=='none'){const r={id:uid(),type:fType,amount:amt,cat:fCat,note,freq:rep,day:+date.slice(8)};r.next=nextDate(date,rep,r.day);if(shv)r.sh=shv;t.rec=r.id;S.recurring.push(r);recurringNotice(runRecurring())}
+  else if(shv)setSh('txns',t,shv);
   toast(t.type==='income'?'Income added':'Expense added',(t.type==='income'?'+':'')+money(amt,2)+' · '+t.cat+(rep!=='none'?' · repeats':''),'good');
   S.month=t.date.slice(0,7);const xb=$('#addBtn').offsetParent?$('#addBtn'):$('#fab');gainXP(5,xb);completeMission('log');commit();
 });
@@ -1675,7 +1684,7 @@ $('#txForm').addEventListener('submit',e=>{
 /* ============ Goals ============ */
 function contribute(id,amt,el){
   const g=S.goals.find(x=>x.id===id);if(!g||!(amt>0))return;
-  g.saved=Math.round((g.saved+amt)*100)/100;S.txns.push({id:uid(),date:iso(new Date()),type:'expense',amount:Math.round(amt*100)/100,cat:'Savings',note:g.name,goal:g.id});const after=g.saved/g.target;g.hit=g.hit||{};
+  g.saved=Math.round((g.saved+amt)*100)/100;if(g.from)g.extra=Math.round(((+g.extra||0)+amt)*100)/100;S.txns.push({id:uid(),date:iso(new Date()),type:'expense',amount:Math.round(amt*100)/100,cat:'Savings',note:g.name,goal:g.id});const after=g.saved/g.target;g.hit=g.hit||{};
   const [x,y]=centerOf(el);let milestone=false;
   for(const m of [25,50,75,100]){if(after*100>=m&&!g.hit[m]){g.hit[m]=1;milestone=true;
     if(m===100){notify('Goal reached: '+g.name,money(g.target)+' fully funded','win');showAch({kind:'goal',title:g.name,sub:money(g.target)+' fully funded. Well done.',icon:g.icon,xp:0})}
@@ -1737,6 +1746,7 @@ function itemOpen(id,cat){
     <div class="amtwrap" style="border:0;padding:6px 0 4px;margin:0"><span>${esc(curSymbol())}</span><input id="iAmt" type="text" inputmode="decimal" placeholder="0" value="${it?it.amt:''}" aria-label="Amount"></div>
     <div class="freq" id="iFreq">${Object.entries(FREQ).map(([k,[l]])=>`<button type="button" data-f="${k}" class="${k===IM.f?'on':''}">${l}</button>`).join('')}</div>
     <div class="conv" id="iConv" style="margin:4px 0 6px">${convText(it?it.amt:0,IM.f)}</div>
+    ${shareField('iShare',it?shOf('items',it):'')}
     <div class="row2"><button type="button" class="btn sec" data-act="itemClose">Cancel</button><button class="btn pri" type="submit">Save item</button></div>
   </form>`;
   $('#itemModal').classList.add('open');setTimeout(()=>$('#iName').focus(),30);
@@ -1863,7 +1873,7 @@ function rvCommit(){
   R.groups.forEach(g=>{
     if(g.remember&&g.type!=='transfer'&&g.key!=='(no description)'){
       const key=normNote(g.rkey??g.dkey);if(!key)return;S.rules=(S.rules||[]).filter(r=>r.match!==key);S.rules.push({id:uid(),match:key,type:g.type,cat:g.cat});rules++;
-      S.txns.forEach(x=>{if(x.src==='bank'&&!x.goal&&!x.pair&&matchKey(x.note,key)&&x.type===g.type&&x.cat!==g.cat){x.cat=g.cat;touched++}});
+      S.txns.forEach(x=>{if(x.src==='bank'&&!x.goal&&!x.pair&&!x.from&&matchKey(x.note,key)&&x.type===g.type&&x.cat!==g.cat){x.cat=g.cat;touched++}});
     }});
   R.staged.forEach(t=>{delete t.ruled;S.txns.push(t)});
   $('#reviewModal').classList.remove('open');RV=null;
@@ -1940,7 +1950,7 @@ async function pushNow(){
     else{
     const at=new Date(Math.max(Date.now(),(S.syncAt||0)+1));S.syncUid=SB.user.id;
     const {error}=await SB.client.from('boards').upsert({user_id:SB.user.id,data:S,updated_at:at.toISOString()});
-    if(error)throw error;S.syncAt=at.getTime();store();setSync('synced');}
+    if(error)throw error;S.syncAt=at.getTime();store();setSync('synced');feedJoint();}
   }catch(e){setSync('error')}
   SB.pushing=false;if(SB.again||(S.savedAt||0)>(S.syncAt||0)&&SB.status==='synced'){SB.again=false;schedulePush()}
 }
@@ -2105,7 +2115,7 @@ async function refreshBoards(){
       if(!document.querySelector('.modal.open'))inviteModal(nw[0])}
     if(BOARD)await loadPeople();
   }catch(e){}
-  renderTop();renderBoardSw();refreshShareCard();
+  renderTop();renderBoardSw();refreshShareCard();if(!BOARD)feedJoint();
 }
 function startPoll(){
   clearInterval(BD.poll);if(!SB.user)return;
@@ -2131,7 +2141,7 @@ function shareCard(){
   if(!BOARD){
     return h+inv+`<p class="muted" style="font-size:13px;margin-bottom:12px">This is your personal board and only you can see it. A joint board is a separate board you share with someone else. You both see and edit the same budget, bills and transactions, each with your own login.</p>
     ${BD.list.length?`<div class="shsec">${BD.list.map(x=>`<div class="lrow">${catChip({i:'users',c:'#0e7a5c'},30)}<div class="grow"><div class="nm" style="font-size:13px">${esc(x.name)}</div><div class="sb">${x.members} ${x.members===1?'person':'people'} · you are ${x.role==='owner'?'the owner':'a member'}</div></div><button class="btn sec sm" data-act="boardGo" data-id="${x.id}">Open</button></div>`).join('')}</div>`:''}
-    <button class="btn pri" data-act="boardNew">${ic('plus',16,2)}New joint board</button>`;
+    ${feedSection()}<button class="btn pri" data-act="boardNew">${ic('plus',16,2)}New joint board</button>`;
   }
   const b=curBoard(),me=BD.people.find(p=>p.me),owner=me&&me.role==='owner';
   return h+inv+`<form id="bdNameForm" class="shrow"><label class="field" style="flex:1">Board name<input class="inp" id="bdName" maxlength="40" value="${esc(b?b.name:'')}"></label><button class="btn sec" type="submit">Save</button></form>
@@ -2206,6 +2216,105 @@ async function shareSubmit(e){
   return false;
 }
 
+/* ============ Personal to joint feed ============ */
+/* Entries you mark as shared on your personal board, plus anything imported from a joint bank account,
+   are copied to the joint board. Your personal board is the source: edits and deletes flow across. */
+const FEEDK=['txns','items','recurring','goals'];
+const canShare=()=>!!(SB.user&&!BOARD&&BD.list.length);
+const bName=id=>{const b=BD.list.find(x=>x.id===id);return b?b.name:'joint board'};
+const jointOf=a=>(a&&(S.settings.jointAccts||{})[a])||'';
+function shInherit(t){
+  if(t.rec){const r=(S.recurring||[]).find(x=>x.id===t.rec);if(r&&r.sh)return r.sh}
+  if(t.goal){const g=(S.goals||[]).find(x=>x.id===t.goal);if(g&&g.sh)return g.sh}
+  return jointOf(t.acct);
+}
+function shOf(kind,x){if(!x)return '';if(kind!=='txns')return x.sh||'';return x.sh==='-'?'':(x.sh||shInherit(x))}
+function setSh(kind,x,v){v=v||'';if(kind!=='txns'){if(v)x.sh=v;else delete x.sh;return}if(v===shInherit(x))delete x.sh;else x.sh=v||'-'}
+function shareField(id,cur,hint){
+  if(!canShare())return '';
+  return `<label class="field shfield">Show on a joint board<select class="inp" id="${id}"><option value="">No, keep it personal</option>${BD.list.map(b=>`<option value="${b.id}" ${cur===b.id?'selected':''}>Yes, on ${esc(b.name)}</option>`).join('')}</select><span class="shhint">${esc(hint||'A linked copy shows on the joint board. Change or delete it here and the copy follows.')}</span></label>`;
+}
+function shTag(kind,x){
+  if(BOARD)return x.from?' · From '+esc(x.from.n||'a personal board'):'';
+  const b=SB.user&&shOf(kind,x);return b&&BD.list.some(y=>y.id===b)?' · Shared to '+esc(bName(b)):'';
+}
+function lockBtn(x){const k=S.txns.includes(x)?'txns':S.items.includes(x)?'items':'recurring';return `<button class="del" style="opacity:1" data-act="lockInfo" data-kind="${k}" data-id="${x.id}" aria-label="Shared from a personal board">${ic('users',14)}</button>`}
+function lockedMsg(x){toast('Shared from '+(x.from.n||'a personal board'),'Change or delete it on their personal board and it updates here','info')}
+function locked(list,id){if(!BOARD)return false;const x=(list||[]).find(y=>y.id===id);if(x&&x.from){lockedMsg(x);return true}return false}
+function goalShareLine(g){
+  if(BOARD)return g.from?`<div class="shline">${ic('users',13)}Shared by ${esc(g.from.n||'a personal board')}${g.extra?` · ${money(g.extra)} added here`:''}</div>`:'';
+  if(!canShare())return '';const b=g.sh&&BD.list.some(y=>y.id===g.sh)?g.sh:'';
+  return `<button class="shline lnk" data-act="goalShare" data-id="${g.id}">${ic('users',13)}${b?'Shared to '+esc(bName(b)):'Share to a joint board'}</button>`;
+}
+function goalShare(id){
+  const g=S.goals.find(x=>x.id===id);if(!g)return;const ids=BD.list.map(b=>b.id),i=ids.indexOf(g.sh);
+  const nx=i<0?ids[0]:ids[i+1]||'';if(nx)g.sh=nx;else delete g.sh;save();render(true);
+  toast(nx?'Goal shared to '+bName(nx):'Goal is personal again',nx?'Your partner sees it and can add to it there':'It has been taken off the joint board','good');
+}
+function myName(){const n=(S.settings.myName||'').trim();if(n)return n;const e=((SB.user&&SB.user.email)||'').split('@')[0].replace(/[^a-zA-Z]+.*$/,'');return e?e[0].toUpperCase()+e.slice(1):'Partner'}
+function feedFor(b){
+  const me={u:SB.user.id,n:myName()},out={};
+  for(const k of FEEDK)out[k]=(S[k]||[]).filter(x=>isObj(x)&&shOf(k,x)===b).map(x=>{const c=JSON.parse(J(x));delete c.sh;c.from=me;return c});
+  return out;
+}
+function goalMirror(m,ex){const extra=ex?(+ex.extra||0):0,g=Object.assign({},m,{mine:m.saved,extra,saved:Math.round((m.saved+extra)*100)/100});if(ex&&ex.hit)g.hit=Object.assign({},m.hit||{},ex.hit);return g}
+function applyFeed(d,feed,me){
+  d=JSON.parse(J(d||{}));
+  for(const k of FEEDK){
+    const arr=Array.isArray(d[k])?d[k]:[],F=new Map(feed[k].map(x=>[x.id,x])),used=new Set(),out=[];
+    for(const x of arr){
+      const ob=isObj(x),mine=ob&&x.from&&x.from.u===me;
+      if(ob&&F.has(x.id)){if(used.has(x.id))continue;used.add(x.id);const m=F.get(x.id);out.push(k==='goals'?goalMirror(m,mine?x:null):m)}
+      else if(!mine)out.push(x);
+    }
+    for(const m of feed[k])if(!used.has(m.id))out.push(k==='goals'?goalMirror(m,null):m);
+    d[k]=out;
+  }
+  return d;
+}
+const FS={busy:false,again:false};
+const fedKey=b=>KEY+'.feed.'+(SB.user?SB.user.id:'')+'.'+b;
+async function pushFeed(b,feed){
+  for(let i=0;i<4;i++){
+    const {data:row,error}=await SB.client.from('shared_boards').select('data,updated_at').eq('id',b).maybeSingle();
+    if(error)throw error;if(!row)return true;
+    const next=applyFeed(row.data,feed,SB.user.id);
+    if(J(next)===J(applyFeed(row.data,{txns:[],items:[],recurring:[],goals:[]},'-')))return true;
+    const at=new Date(Math.max(Date.now(),Date.parse(row.updated_at)+1)).toISOString();
+    const {data:upd,error:e2}=await SB.client.from('shared_boards').update({data:next,updated_at:at}).eq('id',b).eq('updated_at',row.updated_at).select('updated_at');
+    if(e2)throw e2;if(upd&&upd.length)return true;
+  }
+  return false;
+}
+async function feedJoint(){
+  if(!SB.user||!SB.client||BOARD)return;
+  if(FS.busy){FS.again=true;return}FS.busy=true;
+  try{
+    const member=new Set(BD.list.map(x=>x.id)),targets=new Set(S.flags.fedTo||[]),fed=[];
+    for(const k of FEEDK)(S[k]||[]).forEach(x=>{const b=isObj(x)&&shOf(k,x);if(b)targets.add(b)});
+    for(const b of targets){
+      if(!member.has(b)||BOARD)continue;
+      const feed=feedFor(b),sig=J(feed),has=FEEDK.some(k=>feed[k].length);
+      let last=null;try{last=localStorage.getItem(fedKey(b))}catch(e){}
+      let ok=true;if(last!==sig){ok=false;try{ok=await pushFeed(b,feed)}catch(e){}if(ok)try{localStorage.setItem(fedKey(b),sig)}catch(e){}else FS.again=true}
+      if(has||!ok)fed.push(b);
+    }
+    if(!BOARD&&J(fed.sort())!==J((S.flags.fedTo||[]).slice().sort())){S.flags.fedTo=fed;save()}
+  }catch(e){}
+  FS.busy=false;if(FS.again){FS.again=false;setTimeout(feedJoint,15000)}
+}
+function feedSection(){
+  if(!BD.list.length)return '';
+  const accts=[...new Set(S.txns.map(x=>x.acct).filter(Boolean))].sort(),ja=S.settings.jointAccts||{};
+  const n=FEEDK.reduce((a,k)=>a+(S[k]||[]).filter(x=>isObj(x)&&shOf(k,x)).length,0);
+  return `<div class="shsec"><div class="eyebrow" style="margin-bottom:4px">Feed your joint board</div>
+    <p class="muted" style="font-size:12.5px;margin-bottom:10px">Anything from a joint bank account goes across automatically. You can also share single transactions, bills, budget items and goals when you add or edit them. ${n?`<b style="color:var(--ink);font-weight:500">${n} ${n===1?'entry is':'entries are'} shared right now.</b>`:''}</p>
+    ${accts.length?accts.map(a=>`<div class="lrow">${catChip({i:'bank',c:ja[a]?'#0e7a5c':'#8d95a2'},30)}<div class="grow"><div class="nm" style="font-size:13px">${esc(a)}</div><div class="sb">${S.txns.filter(x=>x.acct===a).length} imported transactions</div></div><select class="inp jasel" data-ja="${esc(a)}" aria-label="Where ${esc(a)} goes"><option value="">Personal only</option>${BD.list.map(b=>`<option value="${b.id}" ${ja[a]===b.id?'selected':''}>Joint: ${esc(b.name)}</option>`).join('')}</select></div>`).join('')
+      :'<p class="subtle" style="font-size:12.5px">Import a bank statement on the Transactions page, then pick which accounts are joint here.</p>'}
+    <label class="field" style="margin-top:12px;max-width:260px">Your name on joint boards<input class="inp" id="sMyName" maxlength="24" value="${esc(S.settings.myName||'')}" placeholder="${esc(myName())}"></label>
+  </div>`;
+}
+
 /* ============ Events ============ */
 document.addEventListener('click',e=>{
   if(!e.target.closest('#npanel')&&!e.target.closest('[data-act="bell"]'))$('#npanel').classList.remove('open');
@@ -2236,7 +2345,9 @@ document.addEventListener('click',e=>{
   if(a==='install'&&installEvt){installEvt.prompt();installEvt.userChoice.finally(()=>{installEvt=null;render(true)});return}
   if(a==='ruleDel'){const r=(S.rules||[]).find(x=>x.id===el.dataset.id);S.rules=S.rules.filter(x=>x.id!==el.dataset.id);save();render(true);if(r)toast('Rule removed',r.match,'info');return}
   if(a==='more'){$('#msheet').classList.toggle('open');return}
-  if(a==='txEdit'){openModal('edit',el.dataset.id);return}
+  if(a==='txEdit'){if(locked(S.txns,el.dataset.id))return;openModal('edit',el.dataset.id);return}
+  if(a==='lockInfo'){const k=el.dataset.kind,x=(S[k]||[]).find(y=>y.id===el.dataset.id);if(x)lockedMsg(x);return}
+  if(a==='goalShare'){goalShare(el.dataset.id);return}
   if(a==='alertsOn'){if(!('Notification' in window))return;Notification.requestPermission().then(async p=>{S.settings.phoneAlerts=p==='granted';save();
     if(p!=='granted'){$('#remindCard').innerHTML=remindCard();toast('Alerts not allowed','You can change this in your browser settings','warn');return}
     const closed=await pushSubscribe();$('#remindCard').innerHTML=remindCard();
@@ -2244,8 +2355,8 @@ document.addEventListener('click',e=>{
   if(a==='alertsOff'){S.settings.phoneAlerts=false;save();pushUnsubscribe().then(()=>{$('#remindCard').innerHTML=remindCard()});return}
   if(a==='alertsTest'){if(pushOn()&&SB.client){el.disabled=true;SB.client.functions.invoke('bill-reminders',{body:{test:true}}).then(({data,error})=>{el.disabled=false;if(error||!data||!data.sent)toast('Test did not go through','Turn alerts off and on again, then retry','warn');else toast('Test sent','It can take a few seconds to arrive','good')})}else sysNotify('Test alert','Bill reminders will show up like this','test');return}
   if(a==='recNew'){openModal('new');$('#fRepeat').value='monthly';return}
-  if(a==='recEdit'){openModal('rule',el.dataset.id);return}
-  if(a==='recDel'){const r=S.recurring.find(x=>x.id===el.dataset.id);S.recurring=S.recurring.filter(x=>x.id!==el.dataset.id);save();render(true);if(r)toast('Stopped repeating '+(r.note||r.cat),'Past transactions are kept','info');return}
+  if(a==='recEdit'){if(locked(S.recurring,el.dataset.id))return;openModal('rule',el.dataset.id);return}
+  if(a==='recDel'){if(locked(S.recurring,el.dataset.id))return;const r=S.recurring.find(x=>x.id===el.dataset.id);S.recurring=S.recurring.filter(x=>x.id!==el.dataset.id);save();render(true);if(r)toast('Stopped repeating '+(r.note||r.cat),'Past transactions are kept','info');return}
   if(a==='fDel'){$('#modal').classList.remove('open');if(MM.mode==='rule'){const r=S.recurring.find(x=>x.id===MM.id);S.recurring=S.recurring.filter(x=>x.id!==MM.id);save();render(true);if(r)toast('Stopped repeating '+(r.note||r.cat),'Past transactions are kept','info')}else{delTx(MM.id);save();render(true);toast('Transaction deleted','','info')}return}
   if(a==='achClose'){closeAch();return}
   if(a==='mission'){const m=MISSIONS.find(x=>x.id===el.dataset.id);if(m.act==='add')openModal();else{S.view=m.view;if(m.id==='budget')completeMission('budget',el);save();render();scrollTo({top:0})}return}
@@ -2257,9 +2368,9 @@ document.addEventListener('click',e=>{
   if(a==='wizDone'){S.flags.setup=true;$('#wiz').classList.remove('open');S.view='budgets';checkAlerts();evalChallenges();save();render();return}
   if(a==='toggleCat'){const c=el.dataset.cat;OPEN.has(c)?OPEN.delete(c):OPEN.add(c);render(true);return}
   if(a==='itemNew'){itemOpen(null,el.dataset.cat);return}
-  if(a==='itemEdit'){itemOpen(el.dataset.id);return}
+  if(a==='itemEdit'){if(locked(S.items,el.dataset.id))return;itemOpen(el.dataset.id);return}
   if(a==='itemClose'){$('#itemModal').classList.remove('open');return}
-  if(a==='itemDel'){const it=S.items.find(x=>x.id===el.dataset.id);S.items=S.items.filter(x=>x.id!==el.dataset.id);commit();if(it)toast('Removed '+it.name,'','info');return}
+  if(a==='itemDel'){if(locked(S.items,el.dataset.id))return;const it=S.items.find(x=>x.id===el.dataset.id);S.items=S.items.filter(x=>x.id!==el.dataset.id);commit();if(it)toast('Removed '+it.name,'','info');return}
   if(a==='nav'){S.view=el.dataset.view;if(S.view==='budgets')completeMission('budget');save();render();scrollTo({top:0})}
   else if(a==='add')openModal();
   else if(a==='closeModal')$('#modal').classList.remove('open');
@@ -2269,9 +2380,9 @@ document.addEventListener('click',e=>{
   else if(a==='month'){S.month=shiftYM(S.month,+el.dataset.n);save();render()}
   else if(a==='bell'){const p=$('#npanel');p.classList.toggle('open');if(p.classList.contains('open'))renderNotifs()}
   else if(a==='readAll'){S.notifs.forEach(n=>n.read=true);save();renderTop()}
-  else if(a==='delTx'){delTx(el.dataset.id);save();render(true);toast('Transaction deleted','','info')}
+  else if(a==='delTx'){if(locked(S.txns,el.dataset.id))return;delTx(el.dataset.id);save();render(true);toast('Transaction deleted','','info')}
   else if(a==='contrib'){const amt=el.dataset.amt?+el.dataset.amt:parseFloat(($('#c_'+el.dataset.id)||{}).value);contribute(el.dataset.id,amt,el)}
-  else if(a==='delGoal'){if(el.dataset.armed){S.goals=S.goals.filter(g=>g.id!==el.dataset.id);save();render()}else{el.dataset.armed=1;el.style.width='auto';el.style.padding='0 8px';el.style.color='var(--neg)';el.textContent='Delete?';setTimeout(()=>{if(el.isConnected){delete el.dataset.armed;el.removeAttribute('style');el.innerHTML=ic('x',14)}},3000)}}
+  else if(a==='delGoal'){if(locked(S.goals,el.dataset.id))return;if(el.dataset.armed){S.goals=S.goals.filter(g=>g.id!==el.dataset.id);save();render()}else{el.dataset.armed=1;el.style.width='auto';el.style.padding='0 8px';el.style.color='var(--neg)';el.textContent='Delete?';setTimeout(()=>{if(el.isConnected){delete el.dataset.armed;el.removeAttribute('style');el.innerHTML=ic('x',14)}},3000)}}
   else if(a==='export'){
     const data=JSON.stringify(S,null,1);
     try{const u=URL.createObjectURL(new Blob([data],{type:'application/json'})),l=document.createElement('a');l.href=u;l.download='moneyboard-backup-'+iso(new Date())+'.json';document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),2000)}catch(err){}
@@ -2295,6 +2406,9 @@ document.addEventListener('change',e=>{const t=e.target;
   if(t.id==='fc'){F.cat=t.value;renderTxList()}
   else if(t.id==='pcut'){P.cut=t.value;renderCut()}
   else if(t.id==='sCur'){S.settings.currency=t.value;save();render()}
+  else if(t.dataset.ja!=null){const ja=S.settings.jointAccts=S.settings.jointAccts||{},a=t.dataset.ja;if(t.value)ja[a]=t.value;else delete ja[a];save();refreshShareCard();
+    const n=S.txns.filter(x=>x.acct===a&&shOf('txns',x)).length;toast(t.value?a+' now feeds '+bName(t.value):a+' is personal only',t.value?n+' transaction'+(n===1?'':'s')+' will show on the joint board, plus new imports':'Its transactions come off the joint board','good')}
+  else if(t.id==='sMyName'){S.settings.myName=t.value.trim().slice(0,24);save();toast('Name saved','Shared entries show as from '+myName(),'good')}
   else if(t.id==='sRemind'){S.settings.remind=+t.value;checkBills(true);save();toast(+t.value?'Bill reminders on':'Bill reminders off',+t.value?'You will be reminded '+t.selectedOptions[0].text.toLowerCase():'Turn them back on any time here','info')}
   else if(t.id==='bankFile'&&t.files.length){const fs=[...t.files];t.value='';importBankFiles(fs)}
   else if(t.id==='importFile'&&t.files[0]){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.txns))throw 0;S=Object.assign(fresh(),d,{syncUid:S.syncUid,syncAt:S.syncAt,view:S.view});S.flags.welcomed=true;S.flags.sample=false;save();render();toast('Backup restored',S.txns.length+' transactions loaded','good')}catch(err){toast('Import failed','Choose a Moneyboard backup file (.json)','bad')}};r.readAsText(t.files[0])}
@@ -2303,11 +2417,11 @@ document.addEventListener('submit',e=>{
   if(/^bd/.test(e.target.id)){shareSubmit(e);return}
   if(e.target.id==='authForm'){e.preventDefault();authSubmit();return}
   if(e.target.id==='itemForm'){e.preventDefault();const name=$('#iName').value.trim(),cat=$('#iCat').value,amt=parseAmt($('#iAmt').value);if(!name||!(amt>0)){$('#iAmt').focus();return}
-    const ex=IM.id&&S.items.find(x=>x.id===IM.id);if(ex){if(ex.name!==name||ex.cat!==cat)ex.key=null;Object.assign(ex,{name,cat,amt,freq:IM.f})}else S.items.push({id:uid(),key:null,cat,name,amt,freq:IM.f});
+    const ex=IM.id&&S.items.find(x=>x.id===IM.id),shE=$('#iShare');let tgt=ex;if(ex){if(ex.name!==name||ex.cat!==cat)ex.key=null;Object.assign(ex,{name,cat,amt,freq:IM.f})}else{tgt={id:uid(),key:null,cat,name,amt,freq:IM.f};S.items.push(tgt)}if(shE)setSh('items',tgt,shE.value);
     $('#itemModal').classList.remove('open');if(cat!=='Income')OPEN.add(cat);commit();toast('Budget item saved',name+': '+money(amt*FREQ[IM.f][1],2)+' a week','good');return}
   if(e.target.id!=='goalForm')return;e.preventDefault();
   const on=document.querySelector('#gIcon .on'),g={id:uid(),name:$('#gName').value.trim(),target:parseFloat($('#gTarget').value),saved:parseFloat($('#gSaved').value)||0,icon:on?on.dataset.i:'flag',color:GOAL_COLS[S.goals.length%GOAL_COLS.length],hit:{}};
-  if(!g.name||!(g.target>0))return;[25,50,75,100].forEach(m=>{if(g.saved/g.target*100>=m)g.hit[m]=1});
+  const gsh=$('#gShare');if(gsh&&gsh.value)g.sh=gsh.value;if(!g.name||!(g.target>0))return;[25,50,75,100].forEach(m=>{if(g.saved/g.target*100>=m)g.hit[m]=1});
   S.goals.push(g);const [x,y]=centerOf(e.target.querySelector('button[type=submit]'));confetti(x,y,{n:70,power:.9});toast('Goal created',g.name+' · target '+money(g.target),'good');gainXP(10);commit();
 });
 document.addEventListener('mouseover',e=>{const s=e.target.closest('.seg');if(!s||!$('#dVal'))return;const [c,v]=s.dataset.tip.split('|');$('#dVal').textContent=money(+v);$('#dLab').textContent=c});
