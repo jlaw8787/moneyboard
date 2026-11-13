@@ -64,6 +64,7 @@ svg.i{flex:none;display:block}
 .btn:active{transform:scale(.98)}
 .btn.pri{background:var(--accent);color:#fff;box-shadow:0 1px 2px rgba(14,122,92,.25)}
 .btn.pri:hover{background:var(--accent-2)}
+.card.drop{transition:box-shadow .15s,background .15s}.card.drop.over{box-shadow:0 0 0 2px var(--accent);background:var(--accent-soft)}
 .btn.sec{background:var(--surface);border:1px solid var(--line);color:var(--text);box-shadow:var(--shadow)}
 .btn.sec:hover{background:var(--hover)}
 .btn.dng{background:var(--surface);border:1px solid #f0cfcc;color:var(--neg)}
@@ -1214,7 +1215,7 @@ V.transactions=()=>`
       <label class="search">${ic('search',16)}<input id="fq" placeholder="Search transactions" value="${esc(F.q)}"></label>
       <div class="segc" id="ftype">${[['all','All'],['expense','Expenses'],['income','Income'],['transfer','Transfers']].map(([k,l])=>`<button data-ft="${k}" class="${F.type===k?'on':''}">${l}</button>`).join('')}</div>
       <select class="inp" id="fc"><option value="all">All categories</option>${[...Object.keys(CATS),...Object.keys(INCATS)].map(c=>`<option value="${esc(c)}" ${F.cat===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
-      <label class="btn sec" style="cursor:pointer">${ic('upload',16)}Import bank CSV<input type="file" accept=".csv,text/csv" id="bankFile" hidden></label>
+      <label class="btn sec" style="cursor:pointer">${ic('upload',16)}Import CSV<input type="file" accept=".csv,text/csv" id="bankFile" multiple hidden></label>
     </div>
     <div id="txList"></div>
   </div>
@@ -1376,9 +1377,9 @@ V.settings=()=>`
       <p class="muted" style="font-size:13px;margin-bottom:14px">Load sample data to see how everything works, or clear everything and start again.${SB.user?' Clearing also clears the data in your account.':''}</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" data-act="demo">${ic('refresh',16)}Reload sample data</button><button class="btn dng" data-act="clear">${ic('trash',16)}<span>Clear all data</span></button></div>
     </div>
-    <div class="card"><div class="ch"><h3>Import from your bank</h3></div>
-      <p class="muted" style="font-size:13px;margin-bottom:14px">Download a CSV statement from your internet banking (most Australian banks offer this under Statements or Export), then import it here. Categories are guessed from the description and duplicates are skipped.</p>
-      <label class="btn sec" style="cursor:pointer">${ic('upload',16)}Import bank CSV<input type="file" accept=".csv,text/csv" id="bankFile" hidden></label>
+    <div class="card drop" data-drop="bank"><div class="ch"><h3>Import from your bank</h3></div>
+      <p class="muted" style="font-size:13px;margin-bottom:14px">Download a CSV statement from each of your banks (usually under Statements or Export), then pick them all here at once, or drag them onto this card. Each bank's layout is worked out for you, categories are guessed, and anything already imported is skipped, so overlapping dates are fine.</p>
+      <label class="btn sec" style="cursor:pointer">${ic('upload',16)}Import bank CSVs<input type="file" accept=".csv,text/csv" id="bankFile" multiple hidden></label>
     </div>
     <div class="card"><div class="ch"><h3>Category rules</h3><span class="s">${(S.rules||[]).length} saved</span></div>
       ${(S.rules||[]).length?`<div style="max-height:240px;overflow:auto">${S.rules.map(r=>`<div class="lrow">${catChip(r.type==='transfer'?XFER:r.type==='income'?(INCATS[r.cat]||INCATS['Other income']):(CATS[r.cat]||CATS.Other),28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(r.match)}</div><div class="sb">Goes to ${esc(r.cat)}</div></div><button class="del" style="opacity:1" data-act="ruleDel" data-id="${r.id}" aria-label="Delete rule">${ic('trash',14)}</button></div>`).join('')}</div>`:'<p class="muted" style="font-size:13px">No rules yet. Open an imported transaction, fix its category and tick Remember. Future imports then sort it for you.</p>'}
@@ -1563,26 +1564,67 @@ function itemOpen(id,cat){
 const AUTO=[[/woolworths|coles|aldi|iga|harris farm|foodworks|butcher/i,'Groceries'],[/uber eats|menulog|doordash|mcdonald|kfc|hungry jack|domino|cafe|coffee|restaurant|pizza|sushi|bar |pub|hotel/i,'Dining'],[/bp |shell|ampol|caltex|7-eleven|united petrol|fuel|linkt|toll|translink|opal|myki|parking|uber(?! eats)|didi/i,'Transport'],[/agl|origin|energy|energex|ergon|urban utilities|water|telstra|optus|vodafone|tpg|aussie broadband|belong|internet|nbn/i,'Utilities'],[/insurance|nrma|racq|budget direct|aami|allianz|medibank|bupa|hcf|nib|ahm/i,'Insurance'],[/netflix|spotify|stan|disney|binge|kayo|apple\.com|google|youtube|amazon prime|audible|microsoft/i,'Subscriptions'],[/chemist|pharmacy|priceline|medical|dental|physio|gym|fitness/i,'Health'],[/rent|real estate|mortgage|home loan|strata|council/i,'Housing'],[/school|childcare|early learning|oshc/i,'Kids & school'],[/vet|petbarn|pet stock|petstock/i,'Pets'],[/afterpay|zip pay|zippay|credit card|loan repay/i,'Debt'],[/kmart|target|big w|myer|david jones|bunnings|jb hi-fi|amazon|cotton on|uniqlo/i,'Personal'],[/cinema|event|ticketek|ticketmaster|hoyts|event cinemas|bowling/i,'Entertainment']];
 function guessCat(d){for(const [r,c] of AUTO)if(r.test(d))return c;return 'Other'}
 function parseCSV(text){const rows=[];let row=[],cur='',q=false;for(let i=0;i<text.length;i++){const ch=text[i];if(q){if(ch==='"'){if(text[i+1]==='"'){cur+='"';i++}else q=false}else cur+=ch}else if(ch==='"')q=true;else if(ch===','){row.push(cur);cur=''}else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&text[i+1]==='\n')i++;row.push(cur);rows.push(row);row=[];cur=''}else cur+=ch}if(cur||row.length){row.push(cur);rows.push(row)}return rows.filter(r=>r.some(c=>c.trim()))}
-function parseDate(v){v=v.trim();let m=v.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);if(m){let y=+m[3];if(y<100)y+=2000;return y+'-'+pad(+m[2])+'-'+pad(+m[1])}m=v.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return m[1]+'-'+m[2]+'-'+m[3];const d=new Date(v);return isNaN(d)?null:iso(d)}
+const MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+function parseDate(v){v=String(v||'').trim().replace(/^"|"$/g,'');let m=v.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/),y;
+  if(m){y=+m[3];if(y<100)y+=2000;if(+m[2]>12||+m[1]>31)return null;return y+'-'+pad(+m[2])+'-'+pad(+m[1])}
+  m=v.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return m[1]+'-'+m[2]+'-'+m[3];
+  m=v.match(/^(\d{1,2})[\s\-\/]+([a-z]{3})[a-z]*[\s\-\/,]+(\d{2,4})/i);if(m&&MON[m[2].toLowerCase()]){y=+m[3];if(y<100)y+=2000;return y+'-'+pad(MON[m[2].toLowerCase()])+'-'+pad(+m[1])}
+  return null}
+const NUMRE=/^[+-]?\(?[+-]?\$?\s?[+-]?[\d,]*\.?\d+\)?(\s?(cr|dr))?$/i;
+function csvAmt(v){const s=String(v==null?'':v).trim();if(!s||!NUMRE.test(s))return NaN;const n=parseFloat(s.replace(/[^\d.]/g,''));if(isNaN(n))return NaN;return (/-|^\(|dr$/i.test(s)?-1:1)*n}
+const txKey=t=>t.bk||(t.date+'|'+t.amount.toFixed(2)+'|'+(t.note||'').toLowerCase());
+/* Work out which columns hold what, and name the bank where the layout is a known one */
+function csvLayout(rows){
+  const HRE=/date|time|amount|description|narrative|debit|credit|details|balance|payee|merchant/;
+  let hi=-1;for(let i=0;i<Math.min(10,rows.length);i++){if(rows[i].filter(c=>HRE.test(c.toLowerCase())).length>=2&&!rows[i].some(c=>parseDate(c))){hi=i;break}}
+  if(hi>=0){
+    const head=rows[hi].map(h=>h.toLowerCase().trim()),j=head.join(',');
+    const pick=list=>{for(const t of list){const i=head.findIndex(h=>typeof t==='function'?t(h):t.test(h));if(i>=0)return i}return -1};
+    const L={hi,di:pick([/^date$/,/^transaction date$/,/^(posted|effective|value|processed) date$/,/^time$/,/date/]),
+      desc:pick([/^description$/,/^narrative$/,/^transaction details$/,/^details$/,/^payee$/,/^merchant name$/,/original description/,/desc/,/narrative|details|memo|payee|particulars|reference/]),
+      ai:pick([/^amount$/,/^total \(aud\)$/,/^amount \(aud\)$/,/^transaction amount$/,h=>/amount|total/.test(h)&&!/debit|credit|balance|withdraw|deposit|sub|round/.test(h)]),
+      dr:pick([/debit|withdraw|money out|paid out/]),cr:pick([h=>/credit|deposit|money in|paid in/.test(h)&&!/card/.test(h)])};
+    L.bank=/narrative/.test(j)&&/debit amount/.test(j)?'Westpac':/transaction details/.test(j)&&/merchant name|transaction type/.test(j)?'NAB':/original description/.test(j)||(/details/.test(j)&&/subcategory/.test(j))?'Macquarie':/payee/.test(j)&&/total \(aud\)/.test(j)?'Up':/^date,description,credit,debit,balance/.test(j)?'ING':/^date,description,debit,credit,balance/.test(j)?'Suncorp':'';
+    return L}
+  const sample=rows.find(r=>r.some(c=>parseDate(c)));if(!sample)return null;
+  const di=sample.findIndex(c=>parseDate(c)),nums=sample.map((c,i)=>i!==di&&!isNaN(csvAmt(c))?i:-1).filter(i=>i>=0);
+  const ai=nums.length?nums[0]:-1;let desc=-1,best=0;sample.forEach((c,i)=>{const n=(c.match(/[a-z]/gi)||[]).length;if(i!==di&&i!==ai&&n>best){best=n;desc=i}});
+  const signed=c=>/^[+-]/.test(String(c||'').trim());
+  const bank=sample.length===4&&ai===1&&desc===2&&signed(sample[1])&&signed(sample[3])?'CommBank':sample.length===3&&ai===1&&desc===2?'ANZ':'';
+  return {hi:-1,di,desc,ai,dr:-1,cr:-1,bank}}
 function importBankCSV(text){
-  const rows=parseCSV(text);if(!rows.length)throw 0;
-  const head=rows[0].map(h=>h.toLowerCase().trim()),hasHead=head.some(h=>/date|amount|description|narrative|debit|credit/.test(h));
-  const find=re=>head.findIndex(h=>re.test(h));
-  let di=hasHead?find(/date/):0,desc=hasHead?find(/desc|narrative|details|memo|transaction|payee/):-1,ai=hasHead?find(/^amount|amount/):-1,dr=hasHead?find(/debit|withdraw/):-1,cr=hasHead?find(/credit|deposit/):-1;
-  const body=hasHead?rows.slice(1):rows;
-  if(!hasHead){const r=body[0];ai=r.findIndex((c,i)=>i!==0&&/^-?\$?[\d,]+\.\d{2}$/.test(c.trim()));desc=r.findIndex((c,i)=>i!==0&&i!==ai&&/[a-z]/i.test(c))}
-  const seen=new Set(S.txns.map(t=>t.date+'|'+t.amount.toFixed(2)+'|'+(t.note||'').toLowerCase()));let added=0,dup=0;
-  for(const r of body){
-    const date=parseDate(r[di]||'');if(!date)continue;
-    let amt=ai>=0?parseFloat(String(r[ai]).replace(/[$,\s]/g,'')):(parseFloat(String(r[cr]||'').replace(/[$,\s]/g,''))||0)-(parseFloat(String(r[dr]||'').replace(/[$,\s]/g,''))||0);
-    if(!amt||isNaN(amt))continue;const note=(desc>=0?r[desc]:'').trim().replace(/\s+/g,' ').slice(0,60);
+  const rows=parseCSV(String(text).replace(/^﻿/,''));if(!rows.length)throw 0;
+  const L=csvLayout(rows);if(!L||L.di<0||(L.ai<0&&L.dr<0&&L.cr<0))throw 0;
+  // How many times each transaction is already stored. Counting (not just yes or no) keeps two real coffees on the same day from being treated as one.
+  const have=new Map();S.txns.forEach(t=>{const k=txKey(t);have.set(k,(have.get(k)||0)+1)});
+  const inFile=new Map();let added=0,dup=0,bad=0;
+  for(const r of rows.slice(L.hi+1)){
+    const date=parseDate(r[L.di]);if(!date){bad++;continue}
+    let amt=L.ai>=0?csvAmt(r[L.ai]):(Math.abs(csvAmt(r[L.cr]))||0)-(Math.abs(csvAmt(r[L.dr]))||0);
+    if(!amt||isNaN(amt)){bad++;continue}
+    const note=(L.desc>=0?String(r[L.desc]||''):'').trim().replace(/\s+/g,' ').slice(0,60);
     const t={id:uid(),date,type:amt<0?'expense':'income',amount:Math.abs(Math.round(amt*100)/100),note,src:'bank'};
+    t.bk=t.date+'|'+t.amount.toFixed(2)+'|'+note.toLowerCase();
+    const n=(inFile.get(t.bk)||0)+1;inFile.set(t.bk,n);if(n<=(have.get(t.bk)||0)){dup++;continue}
     t.cat=t.type==='income'?(/salary|pay|wage/i.test(note)?'Salary':'Other income'):guessCat(note);
     if(/internal transfer|own account|to savings|from savings|savings acc|offset acc|transfer to self/i.test(note)){t.type='transfer';t.cat='Transfer'}
     const rl=findRule(note);if(rl&&(rl.type==='transfer'||rl.type===t.type)){t.type=rl.type;t.cat=rl.cat}
-    const k=t.date+'|'+t.amount.toFixed(2)+'|'+note.toLowerCase();if(seen.has(k)){dup++;continue}seen.add(k);S.txns.push(t);added++;
+    S.txns.push(t);added++;
   }
-  return {added,dup};
+  return {added,dup,bad,bank:L.bank};
+}
+/* Read one or more statement files, from any mix of banks, and report back in one message */
+async function importBankFiles(files){
+  files=[...files].filter(f=>/\.csv$/i.test(f.name)||/csv|text/.test(f.type));if(!files.length){toast('No CSV files found','Export a CSV statement from your bank and try again','bad');return}
+  let added=0,dup=0;const banks=[],failed=[];
+  for(const f of files){try{const r=importBankCSV(await f.text());added+=r.added;dup+=r.dup;const b=r.bank||'your bank';if(!banks.includes(b))banks.push(b)}catch(err){failed.push(f.name)}}
+  if(added||dup){save();render(true);evalChallenges();save()}
+  const list=a=>a.length<3?a.join(' and '):a.slice(0,-1).join(', ')+' and '+a[a.length-1];
+  const fileWord=files.length-failed.length===1?'':' from '+(files.length-failed.length)+' files';
+  const fails=failed.length?' Could not read '+list(failed)+'.':'';
+  if(!added&&!dup){toast(failed.length===1&&files.length===1?'Could not read that file':'Could not read those files','Export a CSV statement from your bank and try again','bad');return}
+  if(!added){toast('Nothing new to import','All '+dup+' transaction'+(dup===1?' was':'s were')+' already in Moneyboard.'+fails,failed.length?'bad':'info');return}
+  toast(added+' transaction'+(added===1?'':'s')+' imported'+fileWord,(banks.length&&!(banks.length===1&&banks[0]==='your bank')?'Read as '+list(banks)+'. ':'')+(dup?dup+' already imported, skipped. ':'')+'Categories were guessed, check them in Transactions.'+fails,failed.length?'bad':'good');
 }
 
 /* ============ Backup reminder and install ============ */
@@ -1786,12 +1828,15 @@ document.addEventListener('input',e=>{const t=e.target;
   else if(t.dataset.p){P[t.dataset.p]=parseFloat(t.value)||0;renderProjection();if(!S.flags.planned){S.flags.planned=true;evalChallenges();save();renderTop()}}
   else if(t.id==='ppct'){P.pct=+t.value;renderCut()}
 });
+['dragenter','dragover'].forEach(ev=>document.addEventListener(ev,e=>{const z=e.target.closest&&e.target.closest('[data-drop="bank"]');if(!z||!e.dataTransfer||![...e.dataTransfer.types].includes('Files'))return;e.preventDefault();z.classList.add('over')}));
+document.addEventListener('dragleave',e=>{const z=e.target.closest&&e.target.closest('[data-drop="bank"]');if(z&&!z.contains(e.relatedTarget))z.classList.remove('over')});
+document.addEventListener('drop',e=>{const z=e.target.closest&&e.target.closest('[data-drop="bank"]');if(!z)return;e.preventDefault();z.classList.remove('over');if(e.dataTransfer.files.length)importBankFiles(e.dataTransfer.files)});
 document.addEventListener('change',e=>{const t=e.target;
   if(t.id==='fc'){F.cat=t.value;renderTxList()}
   else if(t.id==='pcut'){P.cut=t.value;renderCut()}
   else if(t.id==='sCur'){S.settings.currency=t.value;save();render()}
   else if(t.id==='sRemind'){S.settings.remind=+t.value;checkBills(true);save();toast(+t.value?'Bill reminders on':'Bill reminders off',+t.value?'You will be reminded '+t.selectedOptions[0].text.toLowerCase():'Turn them back on any time here','info')}
-  else if(t.id==='bankFile'&&t.files[0]){const r=new FileReader();r.onload=()=>{try{const res=importBankCSV(String(r.result));save();render(true);toast(res.added+' transaction'+(res.added===1?'':'s')+' imported',(res.dup?res.dup+' duplicates skipped. ':'')+'Categories were guessed, check them in Transactions','good');evalChallenges();save()}catch(err){toast('Could not read that file','Export a CSV statement from your bank and try again','bad')}t.value=''};r.readAsText(t.files[0])}
+  else if(t.id==='bankFile'&&t.files.length){const fs=[...t.files];t.value='';importBankFiles(fs)}
   else if(t.id==='importFile'&&t.files[0]){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.txns))throw 0;S=Object.assign(fresh(),d,{syncUid:S.syncUid,syncAt:S.syncAt,view:S.view});S.flags.welcomed=true;S.flags.sample=false;save();render();toast('Backup restored',S.txns.length+' transactions loaded','good')}catch(err){toast('Import failed','Choose a Moneyboard backup file (.json)','bad')}};r.readAsText(t.files[0])}
 });
 document.addEventListener('submit',e=>{

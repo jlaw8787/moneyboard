@@ -1,5 +1,5 @@
 /* Moneyboard offline support. Pages load fresh when online and fall back to the saved copy when offline. */
-const CACHE = 'moneyboard-v4';
+const CACHE = 'moneyboard-v5';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE))); self.skipWaiting(); });
 self.addEventListener('activate', e => {
