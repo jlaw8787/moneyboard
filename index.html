@@ -509,6 +509,21 @@ button.pchip{cursor:pointer}
 .morecard .nm{font-weight:600;color:var(--ink);font-size:14px}.morecard .sb{font-size:12.5px;color:var(--muted);margin-top:2px}
 .mof{display:none}@media (max-width:900px){.mof{display:block;font-size:11px;color:var(--muted);font-weight:400}}
 .txacts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:14px}
+.table th.bkcell,.table td.bkcell{width:32px;padding-right:0}
+.bkc{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:6px;border:1.5px solid #c9ced6;background:var(--surface);color:transparent;cursor:pointer;transition:background .12s,border-color .12s}
+.bkc.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.table tr.bkon td{background:var(--accent-soft)}.table tr.bklk{opacity:.5}.table tbody tr.bklk td{cursor:default}
+.bkt tbody tr.clk:hover .bkc:not(.on){border-color:var(--accent)}
+.dayrow .bkday{margin-left:10px;font-size:12px;vertical-align:baseline}
+#bkBar{position:sticky;bottom:16px;z-index:20}
+.bkbar{margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 12px 10px 16px;box-shadow:0 12px 32px rgba(16,24,40,.14)}
+.bkinfo{display:flex;align-items:center;gap:14px;font-size:13.5px;color:var(--ink);min-height:30px;flex-wrap:wrap}.bkinfo b{font-weight:600}
+.bkinfo .lnk{color:var(--accent)}.bkacts{display:flex;gap:6px;flex-wrap:wrap}
+.btn:disabled{opacity:.45;pointer-events:none;box-shadow:none}
+.bkdel.arm{color:var(--neg);border-color:var(--neg);background:var(--neg-soft)}
+body.bkon .fab{display:none!important}
+body.bkon #toasts{bottom:92px}
+@media (max-width:900px){body.bkon #toasts{bottom:calc(196px + env(safe-area-inset-bottom));right:12px}#bkBar{bottom:calc(72px + env(safe-area-inset-bottom))}.bkbar{padding:10px 12px}.bkacts{width:100%}.bkacts .btn{flex:1;padding:0 6px}}
 .txsum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}.txsum div{background:var(--bg,#f5f6f8);border-radius:10px;padding:10px 12px}.txsum small{display:block;font-size:11.5px;color:var(--muted)}.txsum b{font-size:15px;font-weight:600;color:var(--ink)}.txsum b.pos{color:var(--accent)}
 .table tr.dayrow td{padding:16px 4px 6px;border-bottom:1px solid var(--line2);font-size:12.5px;background:none}.dayrow b{color:var(--ink);font-weight:600}.dayrow span{float:right;color:var(--muted)}
 .mshow{display:none}@media (max-width:900px){.mshow{display:inline}.txacts{justify-content:flex-start}
@@ -1394,15 +1409,18 @@ function gsCard(){
 }
 
 function txTable(list,del){
-  const cols=del?5:4,today=iso(new Date()),yest=addDays(today,-1);let lastD='';
-  const dayHead=d=>{const out=list.filter(x=>x.date===d&&x.type==='expense').reduce((a,x)=>a+x.amount,0);return `<tr class="dayrow"><td colspan="${cols}"><b>${d===today?'Today':d===yest?'Yesterday':new Date(d+'T00:00').toLocaleDateString('en-AU',Object.assign({weekday:'long',day:'numeric',month:'short'},d.slice(0,4)!==today.slice(0,4)?{year:'numeric'}:{}))}</b>${out?`<span>${money(out,2)} spent</span>`:''}</td></tr>`};
-  return `<table class="table"><thead><tr><th>Description</th><th class="hm">Category</th><th class="hm">Date</th><th class="r">Amount</th>${del?'<th style="width:36px"></th>':''}</tr></thead><tbody>${list.map(t=>{const ci=catInfo(t),inc=t.type==='income';const xf=t.type==='transfer';const hd=del&&t.date!==lastD?dayHead(t.date):'';lastD=t.date;return hd+`<tr class="clk" data-act="txEdit" data-id="${t.id}"><td><div class="desc">${catChip(ci)}<div><b>${esc(txName(t))}</b><div class="muted" style="font-size:12px">${t.goal?'Saved to goal':LINKED.has(t.id)?'Counted to '+esc((S.goals.find(g=>g.id===LINKED.get(t.id))||{}).name||'a goal'):xf?'Transfer':t.auto?'Repeating<span class="mshow"> · '+esc(catName(t.cat))+'</span>':'<span class="mshow">'+esc(catName(t.cat))+'</span>'}${del?'':'<span class="mshow"> · '+dLabel(t.date)+'</span>'}${shTag('txns',t)}</div></div></div></td><td class="hm"><span class="pill nt">${esc(catName(t.cat))}</span></td><td class="hm muted">${dLabel(t.date)}</td><td class="r"><span class="amt ${inc?'in':''}" ${xf?'style="color:var(--muted)"':''}>${xf?'':inc?'+':'-'}${money(t.amount,2)}</span></td>${del?`<td class="r">${BOARD&&t.from?`<span class="subtle" title="Shared from a personal board">${ic('users',15)}</span>`:`<button class="del" data-act="delTx" data-id="${t.id}" aria-label="Delete">${ic('trash',15)}</button>`}</td>`:''}</tr>`}).join('')}</tbody></table>`;
+  const bk=del&&BK.on,cols=5,today=iso(new Date()),yest=addDays(today,-1);let lastD='';
+  const dayHead=d=>{const out=list.filter(x=>x.date===d&&x.type==='expense').reduce((a,x)=>a+x.amount,0);let pick='';if(bk){const ids=list.filter(x=>x.date===d&&bkOk(x)).map(x=>x.id);if(ids.length)pick=`<button type="button" class="lnk bkday" data-act="bkDay" data-d="${d}">${ids.every(i=>BK.sel.has(i))?'Clear day':'Select day'}</button>`}return `<tr class="dayrow"><td colspan="${cols}"><b>${d===today?'Today':d===yest?'Yesterday':new Date(d+'T00:00').toLocaleDateString('en-AU',Object.assign({weekday:'long',day:'numeric',month:'short'},d.slice(0,4)!==today.slice(0,4)?{year:'numeric'}:{}))}</b>${pick}${out?`<span>${money(out,2)} spent</span>`:''}</td></tr>`};
+  const pg=bk?list.filter(bkOk):[],pgOn=pg.length&&pg.every(t=>BK.sel.has(t.id));
+  return `<table class="table${bk?' bkt':''}"><thead><tr>${bk?`<th class="bkcell"><span class="bkc${pgOn?' on':''}" data-act="bkPage" role="checkbox" aria-checked="${pgOn?'true':'false'}" aria-label="Select all shown">${ic('check',13,2.5)}</span></th>`:''}<th>Description</th><th class="hm">Category</th><th class="hm">Date</th><th class="r">Amount</th>${del&&!bk?'<th style="width:36px"></th>':''}</tr></thead><tbody>${list.map(t=>{const ci=catInfo(t),inc=t.type==='income';const xf=t.type==='transfer';const hd=del&&t.date!==lastD?dayHead(t.date):'';lastD=t.date;const on=bk&&BK.sel.has(t.id),lk=bk&&!bkOk(t);return hd+`<tr class="clk${on?' bkon':''}${lk?' bklk':''}" data-act="${bk?'bkPick':'txEdit'}" data-id="${t.id}">${bk?`<td class="bkcell"><span class="bkc${on?' on':''}" role="checkbox" aria-checked="${on?'true':'false'}" aria-label="Select">${ic('check',13,2.5)}</span></td>`:''}<td><div class="desc">${catChip(ci)}<div><b>${esc(txName(t))}</b><div class="muted" style="font-size:12px">${t.goal?'Saved to goal':LINKED.has(t.id)?'Counted to '+esc((S.goals.find(g=>g.id===LINKED.get(t.id))||{}).name||'a goal'):xf?'Transfer':t.auto?'Repeating<span class="mshow"> · '+esc(catName(t.cat))+'</span>':'<span class="mshow">'+esc(catName(t.cat))+'</span>'}${del?'':'<span class="mshow"> · '+dLabel(t.date)+'</span>'}${shTag('txns',t)}</div></div></div></td><td class="hm"><span class="pill nt">${esc(catName(t.cat))}</span></td><td class="hm muted">${dLabel(t.date)}</td><td class="r"><span class="amt ${inc?'in':''}" ${xf?'style="color:var(--muted)"':''}>${xf?'':inc?'+':'-'}${money(t.amount,2)}</span></td>${del&&!bk?`<td class="r">${BOARD&&t.from?`<span class="subtle" title="Shared from a personal board">${ic('users',15)}</span>`:`<button class="del" data-act="delTx" data-id="${t.id}" aria-label="Delete">${ic('trash',15)}</button>`}</td>`:''}</tr>`}).join('')}</tbody></table>`;
 }
 
 let F={q:'',type:'all',cat:'all',all:false,acct:'all',lim:150};
+/* Bulk edit: pick transactions, then change their category, account or name, or delete them, with one undo */
+let BK={on:false,sel:new Set(),list:[],undo:null,arm:0};
 V.transactions=()=>`
   <div class="card">
-    <div class="txacts">${(n=>n?`<button class="btn sec sm" data-act="sortOpen">${ic('spark',15)}Sort ${n} unknown</button>`:'')(unknownList().length)}<label class="btn sec sm" style="cursor:pointer">${ic('upload',15)}Import bank CSV<input type="file" accept=".csv,text/csv" id="bankFile" multiple hidden></label></div>
+    <div class="txacts"><button class="btn ${BK.on?'pri':'sec'} sm" data-act="bkToggle">${ic('check',15,2)}${BK.on?'Done selecting':'Select'}</button>${(n=>n?`<button class="btn sec sm" data-act="sortOpen">${ic('spark',15)}Sort ${n} unknown</button>`:'')(unknownList().length)}<label class="btn sec sm" style="cursor:pointer">${ic('upload',15)}Import bank CSV<input type="file" accept=".csv,text/csv" id="bankFile" multiple hidden></label></div>
     <div class="toolbar">
       <label class="search">${ic('search',16)}<input id="fq" placeholder="Search, or an amount like 45.50 or >100" value="${esc(F.q)}" aria-label="Search transactions"></label>
       <div class="segc" id="fscope"><button data-fs="m" class="${F.all?'':'on'}">${esc(ymLabel(S.month,'m'))}</button><button data-fs="a" class="${F.all?'on':''}">All months</button></div>
@@ -1411,6 +1429,7 @@ V.transactions=()=>`
       ${(a=>a.length&&!BOARD?`<select class="inp" id="facct" aria-label="Account"><option value="all">All accounts</option>${a.map(n=>`<option value="${esc(n)}" ${F.acct===n?'selected':''}>${esc(n)}</option>`).join('')}</select>`:'')(acctNames())}
     </div>
     <div id="txList"></div>
+    <div id="bkBar"></div>
   </div>
   ${spottedCard()}${recCard()}`;
 /* ============ Repeating bills spotted in your imports ============
@@ -1486,12 +1505,88 @@ function txMatch(q){
   const words=q.split(/\s+/);
   return t=>{const h=[t.note,txName(t),t.cat,catName(t.cat),t.acct,t.to,t.type==='transfer'?'transfer':''].join(' ').toLowerCase();return words.every(w=>h.includes(w))};
 }
+const bkOk=t=>!(BOARD&&t.from);
+function bkExit(){BK.on=false;BK.sel.clear();BK.undo=null;BK.arm=0;document.body.classList.remove('bkon')}
+function bkSel(){const have=new Set(S.txns.map(t=>t.id));[...BK.sel].forEach(i=>{if(!have.has(i))BK.sel.delete(i)});return S.txns.filter(t=>BK.sel.has(t.id)&&bkOk(t))}
+function renderBk(){
+  const box=$('#bkBar');if(!box)return;if(!BK.on){box.innerHTML='';return}
+  const n=bkSel().length,left=BK.list.filter(i=>!BK.sel.has(i)).length,dis=n?'':' disabled',acct=!BOARD&&acctNames().length;
+  const info=n?`<b>${n} selected</b>${left?`<button type="button" class="lnk" data-act="bkAll">Select all ${BK.list.length}</button>`:''}<button type="button" class="lnk" data-act="bkNone">Clear</button>`
+    :BK.undo?`<b>${esc(BK.undo.msg)}</b><button type="button" class="lnk bkundo" data-act="bkUndo">${ic('refresh',14)}Undo</button>`
+    :`<span class="muted">Tap transactions to select them</span>${BK.list.length?`<button type="button" class="lnk" data-act="bkAll">Select all ${BK.list.length}</button>`:''}`;
+  box.innerHTML=`<div class="bkbar" role="toolbar" aria-label="Bulk edit"><div class="bkinfo">${info}</div><div class="bkacts">
+    <button type="button" class="btn sec sm" data-act="bkCat"${dis}>${ic('layers',15)}Category</button>
+    ${acct?`<button type="button" class="btn sec sm" data-act="bkAcct"${dis}>${ic('bank',15)}Account</button>`:''}
+    <button type="button" class="btn sec sm" data-act="bkName"${dis}>${ic('edit',15)}Rename</button>
+    <button type="button" class="btn sec sm bkdel${BK.arm?' arm':''}" data-act="bkDel"${dis}>${ic('trash',15)}${BK.arm?'Delete '+n+'?':'Delete'}</button>
+  </div></div>`;
+}
+function bkRefresh(){const y=scrollY;renderTxList();scrollTo({top:y})}
+function bkSnap(){return JSON.stringify({txns:S.txns,goals:S.goals})}
+function bkDone(snap,msg){BK.undo={snap,msg};BK.sel.clear();BK.arm=0;$('#authModal').classList.remove('open');const y=scrollY;commit();scrollTo({top:y});toast(msg,'Undo is in the bar at the bottom of the list','good')}
+let BKC={type:'expense',cat:''};
+function bkCatOpen(){
+  const L=bkSel();if(!L.length)return;const ty=[...new Set(L.map(t=>t.type))];BKC={type:ty.length===1?ty[0]:'expense',cat:''};
+  $('#authBox').innerHTML=`<div class="mh"><h2>Change category</h2><button class="del" style="opacity:1" data-act="authClose" aria-label="Close">${ic('x',16)}</button></div>
+  <p class="muted" style="font-size:13px;margin:-8px 0 14px">For ${L.length} transaction${L.length>1?'s':''}. Picking a type here changes it too, so you can turn income into a transfer.</p>
+  <div class="segc" id="bkType" style="width:100%;margin-bottom:14px">${[['expense','Expense'],['income','Income'],['transfer','Transfer']].map(([k,l])=>`<button type="button" data-bkt="${k}" style="flex:1">${l}</button>`).join('')}</div>
+  <div class="catpick" id="bkCats"></div><div class="muted" id="bkCatNote" style="font-size:12.5px;margin:-4px 0 14px"></div>
+  <button type="button" class="btn pri" id="bkCatGo" data-act="bkCatGo" style="width:100%" disabled>${ic('check',16,2)}Pick a category</button>`;
+  bkCatDraw();$('#authModal').classList.add('open');
+}
+function bkCatDraw(){
+  document.querySelectorAll('#bkType button').forEach(b=>b.classList.toggle('on',b.dataset.bkt===BKC.type));
+  const n=bkSel().length,xf=BKC.type==='transfer',src=BKC.type==='income'?INCATS:CATS,g=bkSel().filter(t=>t.goal).length;
+  $('#bkCats').style.display=xf?'none':'';if(xf)BKC.cat='Transfer';else if(!src[BKC.cat])BKC.cat='';
+  if(!xf)$('#bkCats').innerHTML=Object.entries(src).map(([c,i])=>`<button type="button" data-bkc="${esc(c)}" class="${c===BKC.cat?'on':''}">${ic(i.i,18)}${esc(catName(c))}</button>`).join('');
+  const keepG=BKC.type==='expense'&&BKC.cat==='Savings';$('#bkCatNote').textContent=g&&BKC.cat&&!keepG?g+' came from a savings goal. Moving '+(g>1?'them':'it')+' takes the amount off the goal.':'';
+  const b=$('#bkCatGo');b.disabled=!BKC.cat;b.innerHTML=ic('check',16,2)+(BKC.cat?'Move '+n+' to '+esc(xf?'Transfers':catName(BKC.cat)):'Pick a category');
+}
+function bkCatGo(){
+  const L=bkSel(),{type,cat}=BKC;if(!L.length||!cat)return;const snap=bkSnap();
+  L.forEach(t=>{
+    if(t.goal&&!(type==='expense'&&cat==='Savings')){const g=S.goals.find(x=>x.id===t.goal);if(g){g.saved=Math.max(0,Math.round((g.saved-t.amount)*100)/100);if(g.from)g.extra=Math.max(0,Math.round(((+g.extra||0)-t.amount)*100)/100)}delete t.goal}
+    t.type=type;t.cat=cat;if(type!=='transfer')delete t.to;if(cat==='Other'||cat==='Other income')t.sure=1;
+  });
+  bkDone(snap,L.length+' moved to '+(type==='transfer'?'Transfers':catName(cat)));
+}
+function bkAcctOpen(){
+  const L=bkSel();if(!L.length)return;const bank=L.filter(t=>t.src==='bank').length,ok=L.length-bank,names=acctNames();
+  $('#authBox').innerHTML=`<div class="mh"><h2>Change account</h2><button class="del" style="opacity:1" data-act="authClose" aria-label="Close">${ic('x',16)}</button></div>
+  ${ok?`<label class="field">Paid from or into<select class="inp" id="bkAcctSel"><option value="">No account</option>${names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select></label>
+  <p class="muted" style="font-size:12.5px;margin:10px 0 16px">${ok} transaction${ok>1?'s':''} will move${bank?'. '+bank+' from bank imports keep the account their statement came from':''}. Balances update to match.</p>
+  <button type="button" class="btn pri" data-act="bkAcctGo" style="width:100%">${ic('check',16,2)}Move ${ok}</button>`
+  :`<p class="muted" style="font-size:13px">All of these came from bank imports, so they stay in the account their statement came from.</p>`}`;
+  $('#authModal').classList.add('open');
+}
+function bkAcctGo(){
+  const L=bkSel().filter(t=>t.src!=='bank');if(!L.length)return;const a=($('#bkAcctSel')||{}).value||'',snap=bkSnap();
+  L.forEach(t=>{if(a)t.acct=a;else delete t.acct;if(t.to&&t.to===t.acct)delete t.to});
+  bkDone(snap,L.length+' moved to '+(a||'no account'));
+}
+function bkNameOpen(){
+  const L=bkSel();if(!L.length)return;const same=new Set(L.map(t=>t.note||'')).size===1?(L[0].note||''):'';
+  $('#authBox').innerHTML=`<div class="mh"><h2>Rename</h2><button class="del" style="opacity:1" data-act="authClose" aria-label="Close">${ic('x',16)}</button></div>
+  <form id="bkNameForm" style="display:flex;flex-direction:column;gap:12px"><label class="field">New description for ${L.length} transaction${L.length>1?'s':''}<input class="inp" id="bkNameIn" maxlength="60" value="${esc(same)}" placeholder="Netflix, Woolworths, Rent" required></label>
+  <p class="muted" style="font-size:12.5px;margin:0">Handy for tidying messy bank descriptions. Search still finds them by the new name.</p>
+  <button class="btn pri" type="submit" style="width:100%">${ic('check',16,2)}Rename ${L.length}</button></form>`;
+  $('#authModal').classList.add('open');setTimeout(()=>{const i=$('#bkNameIn');i.focus();i.select()},50);
+}
+function bkNameGo(){
+  const L=bkSel(),v=$('#bkNameIn').value.trim().slice(0,60);if(!L.length||!v)return;const snap=bkSnap();
+  L.forEach(t=>{if(t.src==='bank'&&v!==(t.note||''))t.named=1;t.note=v});bkDone(snap,L.length+' renamed to '+v);
+}
+function bkDelGo(){
+  const L=bkSel();if(!L.length)return;if(!BK.arm){BK.arm=1;renderBk();setTimeout(()=>{if(BK.arm){BK.arm=0;renderBk()}},4000);return}
+  const snap=bkSnap();L.forEach(t=>delTx(t.id));bkDone(snap,L.length+' deleted');
+}
+function bkUndo(){if(!BK.undo)return;try{const d=JSON.parse(BK.undo.snap);S.txns=d.txns;S.goals=d.goals}catch(e){return}const m=BK.undo.msg;BK.undo=null;const y=scrollY;commit();scrollTo({top:y});toast('Undone',m,'info')}
 function renderTxList(){
   const hit=txMatch(F.q),keep=t=>(F.type==='all'||t.type===F.type)&&(F.cat==='all'||t.cat===F.cat)&&(F.acct==='all'||t.acct===F.acct||t.to===F.acct)&&hit(t);
   const list=(F.all?S.txns:monthTx(S.month)).filter(keep).sort((a,b)=>b.date.localeCompare(a.date)||String(b.id).localeCompare(String(a.id)));
   const inc=list.filter(t=>t.type==='income').reduce((a,t)=>a+t.amount,0),exp=list.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
   const span=F.all&&list.length?(a=>a===list[0].date.slice(0,7)?ymLabel(a):ymLabel(a,'s')+' '+a.slice(0,4)+' to '+ymLabel(list[0].date.slice(0,7),'s')+' '+list[0].date.slice(0,4))(list[list.length-1].date.slice(0,7)):'';
-  const shown=list.slice(0,F.lim),more=list.length-shown.length;
+  const shown=list.slice(0,F.lim),more=list.length-shown.length;BK.list=list.filter(bkOk).map(t=>t.id);renderBk();
   if(list.length){$('#txList').innerHTML=`<div class="txsum"><div><small>In</small><b class="pos">${money(inc,2)}</b></div><div><small>Out</small><b>${money(exp,2)}</b></div><div><small>Count</small><b>${list.length}</b></div></div>${span?`<div class="subtle" style="font-size:12.5px;margin:-4px 0 10px">${esc(span)}</div>`:''}`+txTable(shown,true)+(more?`<div style="text-align:center;margin-top:14px"><button class="btn sec sm" data-act="txMore">Show ${Math.min(more,150)} more${more>150?', '+more+' left':''}</button></div>`:'');return}
   const elsewhere=!F.all&&(F.q.trim()||F.cat!=='all'||F.acct!=='all'||F.type!=='all')?S.txns.filter(keep).length:0;
   $('#txList').innerHTML=elsewhere?`<div class="empty">${ic('search',28,1.5)}Nothing matches in ${esc(ymLabel(S.month,'m'))}<div style="margin-top:12px"><button class="btn pri sm" data-fs="a">See ${elsewhere} in other months</button></div></div>`:empty('search',F.all?'Nothing matches':'Nothing matches for this month');
@@ -1830,6 +1925,7 @@ function renderNotifs(){
 function render(quiet){
   $('#view').classList.toggle('noanim',!!quiet);
   $('#title').textContent=VIEWS[S.view][1];$('#subtitle').textContent=SUBS[S.view]();
+  if(S.view!=='transactions'&&BK.on)bkExit();document.body.classList.toggle('bkon',BK.on);
   renderNav();renderTop();renderBoardSw();$('#view').innerHTML=V[S.view]();
   if(S.view==='transactions')renderTxList();
   if(S.view==='planner'){renderProjection();renderCut()}
@@ -3048,6 +3144,8 @@ function soClose(){if(!SO)return;const n=SO.sorted;if(n)markActive();$('#sortMod
 document.addEventListener('click',e=>{
   if(!e.target.closest('#npanel')&&!e.target.closest('[data-act="bell"]'))$('#npanel').classList.remove('open');
   if(!e.target.closest('[data-act="more"]'))$('#msheet').classList.remove('open');
+  const bt=e.target.closest('[data-bkt]');if(bt){BKC.type=bt.dataset.bkt;bkCatDraw();return}
+  const bc=e.target.closest('[data-bkc]');if(bc){BKC.cat=bc.dataset.bkc;bkCatDraw();return}
   const gi=e.target.closest('#gIcon button');if(gi){document.querySelectorAll('#gIcon button').forEach(x=>x.classList.toggle('on',x===gi));return}
   const fs=e.target.closest('[data-fs]');if(fs){F.all=fs.dataset.fs==='a';F.lim=150;document.querySelectorAll('#fscope [data-fs]').forEach(b=>b.classList.toggle('on',b.dataset.fs===fs.dataset.fs));renderTxList();return}
   const ft=e.target.closest('[data-ft]');if(ft){F.type=ft.dataset.ft;document.querySelectorAll('[data-ft]').forEach(b=>b.classList.toggle('on',b===ft));renderTxList();return}
@@ -3081,6 +3179,18 @@ document.addEventListener('click',e=>{
   if(a==='ruleDel'){const r=(S.rules||[]).find(x=>x.id===el.dataset.id);S.rules=S.rules.filter(x=>x.id!==el.dataset.id);save();render(true);if(r)toast('Rule removed',r.match,'info');return}
   if(a==='more'){$('#msheet').classList.toggle('open');return}
   if(a==='txEdit'){if(locked(S.txns,el.dataset.id))return;openModal('edit',el.dataset.id);return}
+  if(a==='bkToggle'){if(BK.on)bkExit();else{BK.on=true;BK.undo=null}render(true);return}
+  if(a==='bkPick'){const id=el.dataset.id,t=S.txns.find(x=>x.id===id);if(!t)return;if(!bkOk(t)){lockedMsg(t);return}BK.sel.has(id)?BK.sel.delete(id):BK.sel.add(id);BK.arm=0;bkRefresh();return}
+  if(a==='bkPage'||a==='bkDay'){const rows=[...document.querySelectorAll('#txList tr[data-act="bkPick"]:not(.bklk)')].map(r=>r.dataset.id),ids=a==='bkDay'?rows.filter(i=>(S.txns.find(t=>t.id===i)||{}).date===el.dataset.d):rows,all=ids.length&&ids.every(i=>BK.sel.has(i));ids.forEach(i=>all?BK.sel.delete(i):BK.sel.add(i));BK.arm=0;bkRefresh();return}
+  if(a==='bkAll'){BK.list.forEach(i=>BK.sel.add(i));BK.arm=0;bkRefresh();return}
+  if(a==='bkNone'){BK.sel.clear();BK.arm=0;bkRefresh();return}
+  if(a==='bkCat'){bkCatOpen();return}
+  if(a==='bkCatGo'){bkCatGo();return}
+  if(a==='bkAcct'){bkAcctOpen();return}
+  if(a==='bkAcctGo'){bkAcctGo();return}
+  if(a==='bkName'){bkNameOpen();return}
+  if(a==='bkDel'){bkDelGo();return}
+  if(a==='bkUndo'){bkUndo();return}
   if(a==='lockInfo'){const k=el.dataset.kind,x=(S[k]||[]).find(y=>y.id===el.dataset.id);if(x)lockedMsg(x);return}
   if(a==='goalShare'){goalShare(el.dataset.id);return}
   if(a==='sortOpen'){sorterOpen();return}
@@ -3182,6 +3292,7 @@ document.addEventListener('submit',e=>{
     const n=FEEDK.reduce((a,k)=>a+(S[k]||[]).filter(x=>isObj(x)&&!x.sh&&ruleHit(r,k,x)).length,0);
     feedChanged('Rule added',n+' existing entr'+(n===1?'y':'ies')+' now go to '+bName(r.b));return}
   if(e.target.id==='authForm'){e.preventDefault();authSubmit();return}
+  if(e.target.id==='bkNameForm'){e.preventDefault();bkNameGo();return}
   if(e.target.id==='itemForm'){e.preventDefault();const name=$('#iName').value.trim(),cat=$('#iCat').value,amt=parseAmt($('#iAmt').value);if(!name||!(amt>0)){$('#iAmt').focus();return}
     const ex=IM.id&&S.items.find(x=>x.id===IM.id),shE=$('#iShare');let tgt=ex;if(ex){if(ex.name!==name||ex.cat!==cat)ex.key=null;Object.assign(ex,{name,cat,amt,freq:IM.f});delete ex.full}else{tgt={id:uid(),key:null,cat,name,amt,freq:IM.f};S.items.push(tgt)}if(shE)readShare('iShare','items',tgt);
     $('#itemModal').classList.remove('open');if(cat!=='Income')OPEN.add(cat);commit();toast('Budget item saved',name+': '+money(amt*FREQ[IM.f][1],2)+' a week','good');return}
@@ -3197,6 +3308,7 @@ document.addEventListener('submit',e=>{
 document.addEventListener('mouseover',e=>{const s=e.target.closest('.seg');if(!s||!$('#dVal'))return;const [c,v]=s.dataset.tip.split('|');$('#dVal').textContent=money(+v);$('#dLab').textContent=c});
 document.addEventListener('mouseout',e=>{if(!e.target.closest('.seg')||!$('#dVal'))return;$('#dVal').textContent=money(totals(S.month).exp);$('#dLab').textContent='Total spent'});
 document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&BK.on&&!document.querySelector('.modal.open')&&S.view==='transactions'){if(BK.sel.size){BK.sel.clear();BK.arm=0;bkRefresh()}else{bkExit();render(true)}return}
   if($('#ach').classList.contains('open')){if(e.key==='Enter'||e.key==='Escape'){e.preventDefault();closeAch()}return}
   if(SO&&$('#sortModal').classList.contains('open')){if(e.target.tagName==='INPUT'&&e.target.type!=='checkbox')return;if(e.key==='ArrowLeft'){e.preventDefault();if(SO.i<SO.cards.length)soNext('l')}else if(e.key==='ArrowRight'){e.preventDefault();if(SO.i<SO.cards.length)soAccept()}else if(e.key==='Escape'){e.preventDefault();soClose()}return}
   if($('#wiz').classList.contains('open')){
