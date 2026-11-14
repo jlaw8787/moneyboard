@@ -88,6 +88,8 @@ svg.i{flex:none;display:block}
 .swkeys{font-size:12px;text-align:center;margin-top:10px}.swdone{text-align:center;padding:12px 0}.swdone .cat{margin:0 auto 14px;border-radius:16px}.swdone h2{font-size:20px}.swdone p{font-size:13px;margin:6px 0 14px}.swdone .xpbig{display:inline-block;margin:0 0 16px;font-size:14px;font-weight:600;color:#9a6a10;background:#fcf3df;padding:6px 14px;border-radius:99px}
 .swdone .btn{display:flex;margin:0 auto;min-width:160px;justify-content:center}
 @media (max-width:560px){.swkeys{display:none}}
+.rvlite{padding:8px 10px}.rvlite .btn.sm{flex:none}
+.rvfold{display:flex;align-items:center;gap:6px;width:100%;background:var(--line2);border:0;border-radius:10px;padding:9px 12px;margin:6px 0 8px;font:inherit;font-size:13px;color:var(--ink);cursor:pointer;text-align:left}.rvfold:hover{background:var(--line)}
 .rvf{position:sticky;bottom:-24px;background:var(--surface);padding:12px 0 0;margin-top:4px}
 @media (max-width:560px){.rvh{flex-wrap:wrap}.rvh select.inp.sm{max-width:none;width:calc(100% - 44px);margin-left:44px}.rvrem .rvkey{width:120px}}
 .card.drop{transition:box-shadow .15s,background .15s}.card.drop.over{box-shadow:0 0 0 2px var(--accent);background:var(--accent-soft)}
@@ -624,7 +626,7 @@ const ICONS = {
   sliders:'<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
   bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
-  chevL:'<path d="m15 18-6-6 6-6"/>', chevR:'<path d="m9 18 6-6-6-6"/>',
+  chevL:'<path d="m15 18-6-6 6-6"/>', chevR:'<path d="m9 18 6-6-6-6"/>', chevD:'<path d="m6 9 6 6 6-6"/>', chevU:'<path d="m18 15-6-6-6 6"/>',
   arrowR:'<path d="M5 12h14M13 6l6 6-6 6"/>',
   up:'<path d="M7 14l5-5 5 5"/>', down:'<path d="m7 10 5 5 5-5"/>',
   flame:'<path d="M12 3c1.2 3.2 5 5 5 10a5 5 0 0 1-10 0c0-2.2 1-3.6 2-4.6 0 2 1 3.1 2 3.1 0-3-1.2-5.2 1-8.5z"/>',
@@ -1350,7 +1352,7 @@ function gsCard(){
 }
 
 function txTable(list,del){
-  return `<table class="table"><thead><tr><th>Description</th><th class="hm">Category</th><th class="hm">Date</th><th class="r">Amount</th>${del?'<th style="width:36px"></th>':''}</tr></thead><tbody>${list.map(t=>{const ci=catInfo(t),inc=t.type==='income';const xf=t.type==='transfer';return `<tr class="clk" data-act="txEdit" data-id="${t.id}"><td><div class="desc">${catChip(ci)}<div><b>${esc(t.note||t.cat)}</b><div class="muted" style="font-size:12px">${t.goal?'Saved to goal':xf?'Transfer':t.auto?'Repeating':inc?'Income':'Expense'}${shTag('txns',t)}</div></div></div></td><td class="hm"><span class="pill nt">${esc(t.cat)}</span></td><td class="hm muted">${dLabel(t.date)}</td><td class="r"><span class="amt ${inc?'in':''}" ${xf?'style="color:var(--muted)"':''}>${xf?'':inc?'+':'-'}${money(t.amount,2)}</span></td>${del?`<td class="r">${BOARD&&t.from?`<span class="subtle" title="Shared from a personal board">${ic('users',15)}</span>`:`<button class="del" data-act="delTx" data-id="${t.id}" aria-label="Delete">${ic('trash',15)}</button>`}</td>`:''}</tr>`}).join('')}</tbody></table>`;
+  return `<table class="table"><thead><tr><th>Description</th><th class="hm">Category</th><th class="hm">Date</th><th class="r">Amount</th>${del?'<th style="width:36px"></th>':''}</tr></thead><tbody>${list.map(t=>{const ci=catInfo(t),inc=t.type==='income';const xf=t.type==='transfer';return `<tr class="clk" data-act="txEdit" data-id="${t.id}"><td><div class="desc">${catChip(ci)}<div><b>${esc(txName(t))}</b><div class="muted" style="font-size:12px">${t.goal?'Saved to goal':xf?'Transfer':t.auto?'Repeating':inc?'Income':'Expense'}${shTag('txns',t)}</div></div></div></td><td class="hm"><span class="pill nt">${esc(t.cat)}</span></td><td class="hm muted">${dLabel(t.date)}</td><td class="r"><span class="amt ${inc?'in':''}" ${xf?'style="color:var(--muted)"':''}>${xf?'':inc?'+':'-'}${money(t.amount,2)}</span></td>${del?`<td class="r">${BOARD&&t.from?`<span class="subtle" title="Shared from a personal board">${ic('users',15)}</span>`:`<button class="del" data-act="delTx" data-id="${t.id}" aria-label="Delete">${ic('trash',15)}</button>`}</td>`:''}</tr>`}).join('')}</tbody></table>`;
 }
 
 let F={q:'',type:'all',cat:'all'};
@@ -1373,7 +1375,7 @@ function recCard(){
 }
 function renderTxList(){
   const q=F.q.toLowerCase();
-  const list=monthTx(S.month).filter(t=>(F.type==='all'||t.type===F.type)&&(F.cat==='all'||t.cat===F.cat)&&(!q||(t.note||'').toLowerCase().includes(q)||t.cat.toLowerCase().includes(q))).sort((a,b)=>b.date.localeCompare(a.date));
+  const list=monthTx(S.month).filter(t=>(F.type==='all'||t.type===F.type)&&(F.cat==='all'||t.cat===F.cat)&&(!q||(t.note||'').toLowerCase().includes(q)||txName(t).toLowerCase().includes(q)||t.cat.toLowerCase().includes(q))).sort((a,b)=>b.date.localeCompare(a.date));
   const inc=list.filter(t=>t.type==='income').reduce((a,t)=>a+t.amount,0),exp=list.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
   $('#txList').innerHTML=list.length?`<div style="display:flex;gap:24px;margin-bottom:16px;font-size:13px;flex-wrap:wrap"><span class="muted">${list.length} transactions in ${ymLabel(S.month)}</span><span style="margin-left:auto">In <b class="pos" style="font-weight:600">${money(inc,2)}</b></span><span>Out <b style="font-weight:600;color:var(--ink)">${money(exp,2)}</b></span></div>`+txTable(list,true):empty('search','Nothing matches for this month');
 }
@@ -1558,7 +1560,7 @@ function reportData(ym){
   const cc={};spend.forEach(x=>cc[x.cat]=(cc[x.cat]||0)+x.amount);
   const MV=budView(monthRange(ym),N/7);
   const cats=[...new Set([...Object.keys(cc),...Object.keys(pc)])].map(c=>({c,a:cc[c]||0,b:pc[c]||0,bud:MV.cats[c]?MV.cats[c].b:0,cb:MV.cats[c]})).sort((x,y)=>y.a-x.a||y.b-x.b);
-  const merch=groupBy(spend,x=>(x.src==='bank'?suggestKey(x.note):normNote(x.note))||'('+x.cat+')').map(m=>{const t0=m.items[0];return Object.assign(m,{name:m.k[0]==='('?m.k.slice(1,-1):t0.src==='bank'?titleCase(m.k):t0.note.trim(),cat:topCat(m.items)})});
+  const merch=groupBy(spend,x=>(x.src==='bank'?suggestKey(x.note):normNote(x.note))||'('+x.cat+')').map(m=>{const t0=m.items[0];return Object.assign(m,{name:m.k[0]==='('?m.k.slice(1,-1):t0.src==='bank'?merchName(t0.note)||titleCase(m.k):t0.note.trim(),cat:topCat(m.items)})});
   const big=[...spend].sort((a,b)=>b.amount-a.amount).slice(0,5);
   const incSrc=groupBy(ins,x=>x.cat);
   const wk=[];for(let s=1;s<=N;s+=7){const e=Math.min(s+6,N);wk.push({s,e,v:spend.filter(x=>{const d=+x.date.slice(8);return d>=s&&d<=e}).reduce((a,x)=>a+x.amount,0),future:isCur&&s>cut})}
@@ -1653,7 +1655,7 @@ V.report=()=>{
       ${R.merch.length?R.merch.slice(0,8).map(m=>`<div class="lrow">${catChip(catOf(m.cat),28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(m.name)}</div><div class="sb">${m.n} payment${m.n>1?'s':''} · ${esc(m.cat)}</div></div><span class="amt">${money(m.v,2)}</span></div>`).join(''):empty('cart','No spending this month')}
     </div>
     <div class="card"><div class="ch"><h3>Biggest purchases</h3><span class="s">Single payments</span></div>
-      ${R.big.length?R.big.map(t=>`<div class="lrow clk" data-act="txEdit" data-id="${t.id}">${catChip(catOf(t.cat),28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(t.note||t.cat)}</div><div class="sb">${dLabel(t.date)} · ${esc(t.cat)}${t.acct?' · '+esc(t.acct):''}</div></div><span class="amt">${money(t.amount,2)}</span></div>`).join(''):empty('cart','No spending this month')}
+      ${R.big.length?R.big.map(t=>`<div class="lrow clk" data-act="txEdit" data-id="${t.id}">${catChip(catOf(t.cat),28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(txName(t))}</div><div class="sb">${dLabel(t.date)} · ${esc(t.cat)}${t.acct?' · '+esc(t.acct):''}</div></div><span class="amt">${money(t.amount,2)}</span></div>`).join(''):empty('cart','No spending this month')}
     </div>
   </div>
 
@@ -1753,7 +1755,7 @@ $('#txForm').addEventListener('submit',e=>{
   if(MM.mode==='edit'){
     const t=S.txns.find(x=>x.id===MM.id);if(!t)return;
     if(t.goal){const g=S.goals.find(x=>x.id===t.goal),keep=fType==='expense'&&fCat==='Savings';if(g){const d=(keep?amt:0)-t.amount;g.saved=Math.max(0,Math.round((g.saved+d)*100)/100);if(g.from)g.extra=Math.max(0,Math.round(((+g.extra||0)+d)*100)/100)}if(!keep)delete t.goal}
-    const wasSplit=t.full!=null&&t.sp!=='me'?splitPct('txns',t):100;Object.assign(t,{type:fType,amount:amt,cat:fCat,date,note});delete t.full;if($('#fShare'))readShare('fShare','txns',t);else if(wasSplit<100)setSplit('txns',t,wasSplit,'auto');$('#modal').classList.remove('open');
+    const wasSplit=t.full!=null&&t.sp!=='me'?splitPct('txns',t):100;if(t.src==='bank'&&note!==(t.note||''))t.named=1;Object.assign(t,{type:fType,amount:amt,cat:fCat,date,note});delete t.full;if($('#fShare'))readShare('fShare','txns',t);else if(wasSplit<100)setSplit('txns',t,wasSplit,'auto');$('#modal').classList.remove('open');
     const key=normNote($('#fRuleKey').value);
     if($('#fRuleRow').style.display!=='none'&&$('#fRuleOn').checked&&key){
       S.rules=(S.rules||[]).filter(r=>r.match!==key);S.rules.push({id:uid(),match:key,type:fType,cat:fCat});
@@ -1887,8 +1889,42 @@ const merchKey=v=>descToks(v).filter(w=>!KEYSKIP.has(w)).slice(0,2).join(' ');
 function catGuess(d){const raw=String(d||'').toLowerCase(),c=[' '+cleanDesc(d)+' ',raw.replace(/[^a-z ]+/g,' '),raw.replace(/[^a-z0-9 ]+/g,' ')];for(const [r,cat] of AUTO)if(c.some(x=>r.test(x)))return [cat,true];return ['Other',false]}
 function guessCat(d){return catGuess(d)[0]}
 /* A short, specific key for a merchant or payee, skipping bank words like Direct Debit, Transfer To, SQ * */
-const KEYSKIP=new Set(['xx','own','account','fast','transfer','to','from','direct','debit','credit','sq','smp','zlr','lsp','dd','paypal','payid','phone','commbank','app','netbank','australia','pty','ltd','the','www','com','au','aus','qld','ql','qldau','nsw','ns','vic','wa','sa','in','of','and','bpay','card','value','date']);
+const KEYSKIP=new Set(['xx','own','account','fast','transfer','to','from','direct','debit','credit','sq','smp','zlr','lsp','ls','dd','paypal','payid','phone','commbank','app','netbank','australia','pty','ltd','the','www','com','au','aus','qld','ql','qldau','nsw','ns','vic','wa','sa','in','of','and','bpay','card','value','date']);
 const GENKEY=new Set(['transfer to','transfer from','direct debit','direct credit','fast transfer','own account','paypal','transfer']);
+/* Clean merchant names for lists. The raw bank text is kept on the transaction for matching and rules;
+   this only changes what you see. "WOOLWORTHS 1234 IPSWICH QLD AUS Card xx1234" shows as "Woolworths". */
+const BRANDS=[['uber eats','Uber Eats'],['woolworths','Woolworths'],['woolies','Woolworths'],['coles express','Coles Express'],['coles','Coles'],['aldi','Aldi'],['iga','IGA'],['harris farm','Harris Farm'],['costco','Costco'],['bunnings','Bunnings'],['kmart','Kmart'],['big w','Big W'],['target','Target'],['jb hi fi','JB Hi-Fi'],['harvey norman','Harvey Norman'],['the good guys','The Good Guys'],['officeworks','Officeworks'],['myer','Myer'],['david jones','David Jones'],['cotton on','Cotton On'],['rebel','Rebel'],['bcf','BCF'],['anaconda','Anaconda'],['supercheap','Supercheap Auto'],['repco','Repco'],['amazon','Amazon'],['amznmktplace','Amazon'],['ebay','eBay'],['temu','Temu'],['shein','Shein'],['catch com','Catch'],['chemist warehouse','Chemist Warehouse'],['priceline','Priceline'],['terry white','TerryWhite Chemmart'],['mcdonalds','McDonald\'s'],['mcdonald s','McDonald\'s'],['maccas','McDonald\'s'],['kfc','KFC'],['hungry jacks','Hungry Jack\'s'],['hungry jack s','Hungry Jack\'s'],['dominos','Domino\'s'],['domino s','Domino\'s'],['pizza hut','Pizza Hut'],['red rooster','Red Rooster'],['guzman y gomez','Guzman y Gomez'],['guzman','Guzman y Gomez'],['grill d','Grill\'d'],['nandos','Nando\'s'],['oporto','Oporto'],['zambrero','Zambrero'],['subway','Subway'],['starbucks','Starbucks'],['gloria jeans','Gloria Jean\'s'],['boost juice','Boost Juice'],['menulog','Menulog'],['doordash','DoorDash'],['deliveroo','Deliveroo'],['uber','Uber'],['didi','DiDi'],['netflix','Netflix'],['spotify','Spotify'],['disney plus','Disney+'],['disneyplus','Disney+'],['binge','Binge'],['kayo','Kayo'],['foxtel','Foxtel'],['stan com','Stan'],['youtube','YouTube'],['audible','Audible'],['prime video','Prime Video'],['amazon prime','Amazon Prime'],['chatgpt','ChatGPT'],['openai','OpenAI'],['microsoft','Microsoft'],['xbox','Xbox'],['playstation','PlayStation'],['nintendo','Nintendo'],['adobe','Adobe'],['canva','Canva'],['dropbox','Dropbox'],['bp','BP'],['shell','Shell'],['ampol','Ampol'],['caltex','Caltex'],['seven eleven','7-Eleven'],['eleven','7-Eleven'],['united petrol','United'],['puma energy','Puma'],['linkt','Linkt'],['translink','Translink'],['telstra','Telstra'],['optus','Optus'],['vodafone','Vodafone'],['aussie broadband','Aussie Broadband'],['agl','AGL'],['origin energy','Origin'],['energex','Energex'],['ergon','Ergon'],['urban utilities','Urban Utilities'],['racq','RACQ'],['nrma','NRMA'],['aami','AAMI'],['budget direct','Budget Direct'],['medibank','Medibank'],['bupa','Bupa'],['anytime fitness','Anytime Fitness'],['petbarn','Petbarn'],['petstock','Petstock'],['dan murphys','Dan Murphy\'s'],['dan murphy s','Dan Murphy\'s'],['bws','BWS'],['liquorland','Liquorland'],['event cinemas','Event Cinemas'],['hoyts','Hoyts'],['ticketek','Ticketek'],['ticketmaster','Ticketmaster'],['qantas','Qantas'],['virgin australia','Virgin Australia'],['jetstar','Jetstar'],['airbnb','Airbnb'],['afterpay','Afterpay'],['zip pay','Zip'],['sportsbet','Sportsbet'],['github','GitHub'],['netlify','Netlify'],['anthropic','Anthropic'],['apple com','Apple'],['itunes','Apple'],['google','Google'],['paypal','PayPal']];
+const BRAND_LOW=new Set(['Apple','Google','PayPal']); // payment processors: a real merchant named alongside them wins
+const MNC=new Map();
+function merchName(note){
+  const raw=String(note||'');if(!raw.trim())return '';let r=MNC.get(raw);if(r!=null)return r;
+  let s=raw.replace(/value date:?.*$/i,' ').replace(/\bcard\s*(no\.?|number)?\s*[x*]+\d+/gi,' ').replace(/\b(receipt|ref|reference|lodgement ref)\s*(no\.?)?\s*[\w\/-]*\d[\w\/-]*/gi,' ');
+  const ownAcc=/^own account:?/i.test(s);s=s.replace(/^own account:?\s*/i,'');
+  // Transfers and payments to people: keep who it went to or came from
+  let m=s.match(/^(?:fast |osko |internal |online |mobile )?(?:transfer|payment|tfr|deposit)s?\s+(to|from)\s+(?:xx\d+\s*)?([^|]*)/i);
+  if(m){const who=m[2].replace(/\b(commbank app|netbank|app|ref\w*|\d[\d\s]*)\b/gi,' ').replace(/[^a-z&' ]+/gi,' ').replace(/\s+/g,' ').trim();r=(m[1].toLowerCase()==='to'?'To ':'From ')+(who?titleCase(who.toLowerCase()):'another account');r=r.slice(0,32);MNC.set(raw,r);return r}
+  const low=' '+s.toLowerCase().replace(/[^a-z0-9& ]+/g,' ').replace(/\s+/g,' ')+' ';
+  let hit=null;for(const [k,v] of BRANDS){const at=low.indexOf(' '+k+' ');if(at<0)continue;if(!hit||(BRAND_LOW.has(hit[1])&&!BRAND_LOW.has(v))){hit=[k,v];if(!BRAND_LOW.has(v))break}}
+  if(hit){r=hit[1];MNC.set(raw,r);return r}
+  if(/\batm\b/.test(low)&&/withdraw|cash|\batm\d/.test(low)){r='ATM withdrawal';MNC.set(raw,r);return r}
+  s=s.replace(/^(debit card purchase|visa debit purchase|visa purchase|eftpos purchase|card purchase|purchase|pos|eftpos|direct debit|direct credit|bpay|osko payment|tap and pay|contactless|deposit|withdrawal|payment)\s*/i,'')
+    .replace(/^\d{1,2}\s?[a-z]{3}\s+/i,'').replace(/^\d{3,}\s+/,'')
+    .replace(/^(sq|sp|zlr|lsp|smp|pp|ezi|cba|mpos)\s*\*\s*/i,'').replace(/^(ls|lsp|sp|sq)\s+(?=\S+\s+\S)/i,'').replace(/\*/g,' ')
+    .replace(/\|.*$/,'').replace(/\b[\w-]+\.(com|net|org|io)(\.au)?\b\S*/gi,w=>w.split('.')[0]);
+  let w=s.split(/\s+/).filter(x=>x&&!/\d/.test(x)).map(x=>x.replace(/[^a-z&']/gi,'')).filter(Boolean);
+  const STATE=/^(aus|au|aust|australia|nsw|qld|vic|wa|sa|tas|act|nt|ns|ql|qldau|nswau|vicau)$/i;
+  const hadState=w.some(x=>STATE.test(x));
+  while(w.length&&STATE.test(w[w.length-1]))w.pop();
+  w=w.filter(x=>!STATE.test(x)&&!/^(pty|ltd|limited|inc|co)$/i.test(x));
+  // "MERCHANT SUBURB QLD": drop the suburb when the bank tacked one on
+  if(hadState&&w.length>=3){w.pop();if(w.length>=3&&/^(north|south|east|west|mount|mt|port|upper|lower|st|new)$/i.test(w[w.length-1]))w.pop()}
+  r=w.join(' ').replace(/\s+/g,' ').trim();
+  r=r?r.toLowerCase().replace(/(^|[\s&])([a-z])/g,(a,b,c)=>b+c.toUpperCase()).replace(/\b(And|Of|The|At)\b/g,(x,y,i)=>i?x.toLowerCase():x):'';
+  if(!r)r=ownAcc?'Own account transfer':raw.trim();
+  r=r.slice(0,32).trim();if(MNC.size>5000)MNC.clear();MNC.set(raw,r);return r;
+}
+/* What to show for a transaction: bank lines get the clean merchant name, anything you typed or renamed stays as written */
+const txName=t=>t.src==='bank'&&!t.named?(merchName(t.note)||t.cat):(t.note||t.cat);
 function smartKey(note){const n=normNote(note),w=n.split(' ').filter(x=>x.length>1&&!KEYSKIP.has(x));if(!w.length)return /paypal/.test(n)?'paypal':'';const two=w.slice(0,2).join(' ');return (' '+n+' ').includes(' '+two+' ')?two:w[0]}
 /* Learn from what you have already sorted: the latest category you used for the same merchant wins */
 function catHistory(){const h=new Map();S.txns.filter(t=>t.type==='expense'&&t.cat&&t.cat!=='Other'&&!t.goal&&!t.from).sort((a,b)=>a.date<b.date?-1:1).forEach(t=>{const k=merchKey(t.note);if(k)h.set(k,t.cat)});return h}
@@ -1988,24 +2024,33 @@ const tidyFile=f=>f.replace(/\.csv$/i,'').replace(/^[0-9a-f]{6,}[-_]/i,'').repla
 /* Work out which account a file belongs to: the account its overlapping transactions already sit in, another file in this
    import that holds the same transactions, what you called this file last time, then the file's own name */
 function nameFiles(ctx,staged){
-  const map=S.settings.acctMap||{},taken=new Set();
+  const map=S.settings.acctMap||{},ab=S.settings.acctBank||{},live=new Set(S.txns.map(t=>t.acct).filter(Boolean)),taken=new Set();
   ctx.files.forEach(F=>{
     const cnt=new Map();F.matched.forEach(x=>{if(x.acct)cnt.set(x.acct,(cnt.get(x.acct)||0)+1)});
     staged.forEach(t=>{if(t.fi===F.fi&&t.dupAcct)cnt.set(t.dupAcct,(cnt.get(t.dupAcct)||0)+1)});
-    const top=[...cnt.entries()].sort((a,b)=>b[1]-a[1])[0],mk=fileKey(F),twin=Object.entries(F.same).sort((a,b)=>b[1]-a[1])[0];
-    const stem=tidyFile(F.file),digits=(F.file.match(/\d{4,}/g)||[]).pop();
+    const top=[...cnt.entries()].sort((a,b)=>b[1]-a[1])[0],mk=fileKey(F),mk0=oldFileKey(F),twin=Object.entries(F.same).sort((a,b)=>b[1]-a[1])[0];
+    const stem=tidyFile(F.file),digits=acctDigits(F.file),d4=digits&&digits.slice(-4),mine=F.bank?[...live].filter(a=>ab[a]===F.bank||(!ab[a]&&(a===F.bank||a.startsWith(F.bank+' ')))):[];
     let name='',why='';
     if(twin&&twin[1]>=Math.max(3,F.rows*.4)){const T=ctx.files[+twin[0]];name=T.name;F.twin=T.fi;why='Same account as '+T.file+'. They overlap, so the repeats were left out'}
     else if(top&&top[0]&&top[0]!==F.bank){name=top[0];why='Matched to transactions you already have in this account'}
-    else if(map[mk]&&map[mk]!=='?'){name=map[mk];why='Remembered from your last import of this file'}
+    else if(map[mk]&&map[mk]!=='?'){name=map[mk];why=/\|any$/.test(mk)?'Your last '+F.bank+' import went here. If this is a different '+F.bank+' account, give it its own name':'Remembered from your last import of this account'}
+    else if(map[mk0]&&map[mk0]!=='?'){name=map[mk0];why='Remembered from your last import of this file'}
     else if(top&&top[0]){name=top[0];why='Matched to earlier '+top[0]+' imports. Give it its own name if you have more than one account there'}
-    else{name=stem&&stem.length>2?stem:(F.bank?F.bank+' ':'')+(digits?'account '+digits.slice(-4):'account');why='New account, named from the file. Change it if you like, for example Everyday or Joint'}
-    if(F.twin==null){let base=name,k=2;while(taken.has(name)){name=base+' '+k++}}taken.add(name);
-    F.name=name;F.why=why;F.dest=jointOf(name)||'';F.orig=top&&top[0]===F.bank?F.bank:'';
+    else if(F.bank&&d4&&mine.some(a=>a.endsWith(d4))){name=mine.find(a=>a.endsWith(d4));why='Matched to your '+F.bank+' account ending '+d4}
+    else if(F.bank&&mine.length===1&&!(d4&&/\d{4}$/.test(mine[0]))){name=mine[0];why='Your '+F.bank+' account. If this is a different '+F.bank+' account, give it its own name'}
+    else if(F.bank&&mine.length>1&&!d4){name=mine[0];why='You have '+mine.length+' '+F.bank+' accounts. Pick the right one from the list'}
+    else if(F.bank){name=F.bank+(digits?' '+digits.slice(-4):'');why='New account, named after the bank so a different file name next time still lands here. Rename it if you like, for example Everyday or Joint'}
+    else{name=stem&&stem.length>2?stem:(digits?'Account '+digits.slice(-4):'Bank account');why='New account, named from the file. Change it if you like, for example Everyday or Joint'}
+    if(F.twin==null){let base=name,k=2;while(taken.has(name)){name=base+' '+k++}if(name!==base)why='Another file here does not overlap with '+base+', so this looks like a second account. If it is the same account, give both the same name'}taken.add(name);
+    F.name=name;F.why=why;F.sure=!/^(New account|You have|Another file)/.test(why);F.dest=jointOf(name)||'';F.orig=top&&top[0]===F.bank?F.bank:'';
   });
   staged.forEach(t=>{t.acct=ctx.files[t.fi].name});
 }
-const fileKey=F=>(F.bank||'csv')+'|'+tidyFile(F.file).toLowerCase();
+/* Remembered names are keyed by bank and the account digits in the file name, so the same account under a new file name still matches */
+/* Account digits in a file name, ignoring dates like 20Nov2026, 2026-11-20 or 20261120 */
+const acctDigits=f=>{const s=String(f).replace(/\.csv$/i,'').replace(/(?<!\d)(19|20)\d{2}(0[1-9]|1[0-2])([0-2]\d|3[01])(?!\d)/g,' ').replace(/\d{1,2}[\s_-]?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[\s_-]?\d{2,4}/gi,' ').replace(/\d{4}[-_.]\d{1,2}[-_.]\d{1,2}|\d{1,2}[-_.]\d{1,2}[-_.]\d{2,4}/g,' ').replace(/(^|\D)(19|20)\d{2}(?!\d)/g,'$1 ');return (s.match(/\d{4,}/g)||[]).pop()||''};
+const fileKey=F=>{if(!F.bank)return 'csv|'+tidyFile(F.file).toLowerCase();const d=acctDigits(F.file);return F.bank+'|'+(d?'#'+d.slice(-4):'any')};
+const oldFileKey=F=>(F.bank||'csv')+'|'+tidyFile(F.file).toLowerCase();
 /* Money moved between your own accounts shows up twice: out of one bank, into another. Find those pairs. */
 const XHINT=/transfer|trans to|trans from|tfr|xfer|osko|payid|internal|own acc|savings|from .*acc|to .*acc|netbank|fast payment|sweep/i;
 function findPairs(staged){
@@ -2049,7 +2094,8 @@ async function importBankFiles(files){
   if(staged.length&&staged.every(t=>t.dupOf)){toast('Nothing new to import',staged.length+' look like transactions you already have, with a slightly different date or description. '+dup+' were exact matches.','info');return}
   if(!staged.length){toast('Nothing new to import','All '+dup+' transaction'+(dup===1?' was':'s were')+' already in Moneyboard.'+(failed.length?' Could not read '+list(failed)+'.':''),failed.length?'bad':'info');return}
   const pairs=findPairs(staged.filter(t=>!t.dupOf));
-  RV={staged,pairs,dup,banks,failed,list,pairIds:new Set(),files:ctx.files.filter(F=>F.rows>0)};
+  RV={staged,pairs,dup,banks,failed,list,pairIds:new Set(),files:ctx.files.filter(F=>F.rows>0),acctOpen:{},showPairs:false,showSorted:false};
+  pairs.forEach(p=>p.sure=p.on);
   pairs.forEach(p=>{if(p.on){RV.pairIds.add(p.out.id);RV.pairIds.add(p.in.id)}});
   RV.groups=groupStaged();drawReview();$('#reviewModal').classList.add('open');
 }
@@ -2057,9 +2103,13 @@ function catOptions(type,cur){const src=type==='income'?INCATS:CATS;return Objec
 const rvIn=()=>RV.staged.filter(t=>!t.dupOf||t.keep);
 function rvAcctBlock(){
   const R=RV,known=[...new Set(S.txns.map(x=>x.acct).filter(Boolean))].sort(),boards=SB.user&&BD.list.length?BD.list:[];
-  return `<div class="rvs"><h3>Accounts <span class="s">${R.files.length} file${R.files.length>1?'s':''}</span></h3><p class="subtle">Each file is one bank account. Give each account its own name so your joint and personal accounts stay apart.</p>
+  const open=R.files.filter((F,i)=>!F.sure||R.acctOpen[i]).length;
+  return `<div class="rvs"><h3>Accounts <span class="s">${open?R.files.length-open+' of '+R.files.length+' matched':'All matched'}</span></h3>${open?'<p class="subtle">Give each account its own name so your joint and personal accounts stay apart.</p>':''}
     <datalist id="rvAccts">${known.map(a=>`<option value="${esc(a)}">`).join('')}</datalist>
-    ${R.files.map((F,i)=>{const n=R.staged.filter(t=>t.fi===F.fi&&(!t.dupOf||t.keep)).length;return `<div class="rva"><div class="rvah">${catChip({i:'bank',c:F.dest?'#0e7a5c':'#3f63a8'},32)}<div class="grow"><div class="nm">${esc(F.file)}</div><div class="sb">${n} new${F.dup?', '+F.dup+' already in':''}${F.bank?' · '+esc(F.bank)+' layout':''}</div></div></div>
+    ${R.files.map((F,i)=>{const n=R.staged.filter(t=>t.fi===F.fi&&(!t.dupOf||t.keep)).length,full=!F.sure||R.acctOpen[i];
+      const head=`<div class="rvah">${catChip({i:'bank',c:F.dest?'#0e7a5c':'#3f63a8'},32)}<div class="grow"><div class="nm">${esc(full?F.file:F.name)}</div><div class="sb">${full?'':esc(F.file)+' · '}${n} new${F.dup?', '+F.dup+' already in':''}${F.bank?' · '+esc(F.bank):''}</div></div>${full?'':`<button class="btn sec sm" data-rv="acct" data-i="${i}">Change</button>`}</div>`;
+      if(!full)return `<div class="rva rvlite">${head}</div>`;
+      return `<div class="rva">${head}
       <div class="rvaf"><label class="field">Account name<input class="inp" list="rvAccts" data-rvacct="${i}" value="${esc(F.name)}" maxlength="40"></label>
       ${boards.length?`<label class="field">Goes to<select class="inp" data-rvdest="${i}"><option value="">Personal only</option>${boards.map(b=>`<option value="${b.id}" ${F.dest===b.id?'selected':''}>Personal and ${esc(b.name)}</option>`).join('')}</select></label>`:''}</div>
       <p class="subtle rvwhy">${esc(F.why)}${F.orig&&F.orig!==F.name?`. Your older transactions filed as "${esc(F.orig)}" that match this file will be renamed to the account name above.`:''}</p></div>`}).join('')}</div>`;
@@ -2069,24 +2119,31 @@ function rvDupBlock(){
   return `<div class="rvs"><h3>Possibly already imported <span class="s">${d.filter(t=>t.keep).length} of ${d.length} will be added</span></h3><p class="subtle">These look like transactions you already have, with a slightly different date or description. They are skipped unless you tick them.</p>
     ${d.map(t=>`<label class="rvp${t.keep?' on':''}"><input type="checkbox" data-rvkeep="${t.id}" ${t.keep?'checked':''}><span class="grow"><span class="nm">${t.type==='income'?'+':''}${money(t.amount,2)} on ${dLabel(t.date)}</span><span class="sb">New: ${esc(t.note||'no description')}</span><span class="sb">Already have: ${esc(t.dupNote||'no description')}, ${dLabel(t.dupDate)}${t.dupAcct?' · '+esc(t.dupAcct):''}</span></span></label>`).join('')}</div>`;
 }
+const grpUnsure=g=>g.type!=='transfer'&&(g.cat==='Other'||g.cat==='Other income'||g.mixed||g.items.some(t=>!t.sure));
 function drawReview(){
   const R=RV,n=rvIn().length,named=R.banks.filter(b=>b!=='your bank');
-  const otherCount=R.groups.filter(g=>g.cat==='Other'||g.cat==='Other income').reduce((a,g)=>a+g.items.length,0);
   const pairRow=(p,i)=>`<label class="rvp${p.on?' on':''}"><input type="checkbox" data-rvpair="${i}" ${p.on?'checked':''}>
     <span class="cat" style="width:32px;height:32px;background:${XFER.c}14;color:${XFER.c}">${ic('swap',16)}</span>
-    <span class="grow"><span class="nm">${money(p.out.amount,2)} on ${dLabel(p.out.date)}${p.on?'':' <span class="pill" style="background:var(--line2);color:var(--muted)">Possible match</span>'}</span>
-    <span class="sb">Out of ${esc(p.out.acct||'one account')}${p.oldOut?' (already imported)':''}: ${esc(p.out.note||'no description')}</span>
-    <span class="sb">Into ${esc(p.in.acct||'another account')}${p.oldIn?' (already imported)':''}: ${esc(p.in.note||'no description')}</span></span></label>`;
+    <span class="grow"><span class="nm">${money(p.out.amount,2)} on ${dLabel(p.out.date)}${p.sure?'':' <span class="pill" style="background:var(--line2);color:var(--muted)">Possible match</span>'}</span>
+    <span class="sb">Out of ${esc(p.out.acct||'one account')}${p.oldOut?' (already imported)':''}: ${esc(merchName(p.out.note)||'no description')}</span>
+    <span class="sb">Into ${esc(p.in.acct||'another account')}${p.oldIn?' (already imported)':''}: ${esc(merchName(p.in.note)||'no description')}</span></span></label>`;
   const grpRow=(g,i)=>{const inf=g.type==='transfer'?XFER:g.type==='income'?(INCATS[g.cat]||INCATS['Other income']):(CATS[g.cat]||CATS.Other);
-    return `<div class="rvg"><div class="rvh">${catChip(inf,32)}<div class="grow"><div class="nm">${esc(g.type==='transfer'?'Transfers':g.key)}</div><div class="sb">${g.items.length} transaction${g.items.length>1?'s':''} · ${g.type==='income'?'+':''}${money(g.total,2)}${g.ruled?' · sorted by your rule':''}</div></div>
+    return `<div class="rvg"><div class="rvh">${catChip(inf,32)}<div class="grow"><div class="nm">${esc(g.type==='transfer'?'Transfers':merchName(g.items[0].note)||g.key)}</div><div class="sb">${g.items.length} transaction${g.items.length>1?'s':''} · ${g.type==='income'?'+':''}${money(g.total,2)}${g.ruled?' · sorted by your rule':''}</div></div>
       <select class="inp sm" data-rvcat="${i}" aria-label="Category for ${esc(g.key)}">${catOptions(g.type,g.cat)}</select></div>
       ${g.type!=='transfer'&&g.key!=='(no description)'?`<div class="rvrem"><input type="checkbox" data-rvrem="${i}" id="rvr${i}" ${g.remember?'checked':''}><label for="rvr${i}">Always sort</label><input class="inp rvkey" data-rvkey="${i}" value="${esc(g.rkey??g.dkey)}" aria-label="Words to match in future imports"><label for="rvr${i}">here</label></div>`:''}
-      <details><summary>Show transactions</summary>${g.items.slice().sort((a,b)=>a.date<b.date?1:-1).map(t=>`<div class="rvi"><span>${dLabel(t.date)}</span><span class="grow">${esc(t.note||'No description')}${t.acct?` <span class="subtle">· ${esc(t.acct)}</span>`:''}</span><span>${t.type==='income'?'+':''}${money(t.amount,2)}</span></div>`).join('')}</details></div>`};
-  const pairsOn=R.pairs.filter(p=>p.on).length;
+      <details><summary>Show transactions</summary>${g.items.slice().sort((a,b)=>a.date<b.date?1:-1).map(t=>`<div class="rvi"><span>${dLabel(t.date)}</span><span class="grow" title="${esc(t.note||'')}">${esc(merchName(t.note)||'No description')}${t.acct?` <span class="subtle">· ${esc(t.acct)}</span>`:''}</span><span>${t.type==='income'?'+':''}${money(t.amount,2)}</span></div>`).join('')}</details></div>`};
+  const idx=R.groups.map((g,i)=>i),look=idx.filter(i=>grpUnsure(R.groups[i])),done=idx.filter(i=>!grpUnsure(R.groups[i]));
+  const doneTx=done.reduce((a,i)=>a+R.groups[i].items.length,0);
+  const pIdx=R.pairs.map((p,i)=>i),pLook=pIdx.filter(i=>!R.pairs[i].sure),pDone=pIdx.filter(i=>R.pairs[i].sure),pairsOn=R.pairs.filter(p=>p.on).length;
+  const fold=(act,open,label)=>`<button class="rvfold" data-rv="${act}" aria-expanded="${open}">${ic(open?'chevU':'chevD',14)}${label}</button>`;
+  const nothing=!look.length&&!pLook.length&&!RV.staged.some(t=>t.dupOf)&&R.files.every(F=>F.sure);
   $('#reviewBox').innerHTML=`<div class="mh"><h2>Review import</h2><button class="del" style="opacity:1" data-rv="cancel" aria-label="Close">${ic('x',16)}</button></div>
-    <p class="muted" style="font-size:13px;margin:-8px 0 16px">${n} new transaction${n===1?'':'s'}${named.length?' from '+R.list(named):''}.${R.dup?' '+R.dup+' repeat'+(R.dup===1?'':'s')+' of transactions you already have, or of another file here, left out.':''}${R.failed.length?' Could not read '+R.list(R.failed)+'.':''} Nothing is saved until you press Import.</p>
-    ${rvAcctBlock()}${rvDupBlock()}${R.pairs.length?`<div class="rvs"><h3>Transfers between your accounts <span class="s">${pairsOn} of ${R.pairs.length} ticked</span></h3><p class="subtle">Ticked pairs count as transfers, so they are left out of your spending and income.</p>${R.pairs.map(pairRow).join('')}</div>`:''}
-    <div class="rvs"><h3>Categories <span class="s">${otherCount?otherCount+' in Other, worth a look':'grouped by merchant'}</span></h3><p class="subtle">Change a category to fix every transaction in that group at once. Tick Always sort here and future imports do it for you.</p>${R.groups.map(grpRow).join('')}</div>
+    <p class="muted" style="font-size:13px;margin:-8px 0 16px">${n} new transaction${n===1?'':'s'}${named.length?' from '+R.list(named):''}.${R.dup?' '+R.dup+' repeat'+(R.dup===1?'':'s')+' left out.':''}${R.failed.length?' Could not read '+R.list(R.failed)+'.':''} ${nothing?'Everything was sorted for you, so you can press Import.':'Only the ones we were unsure about are shown.'} Nothing is saved until you press Import.</p>
+    ${rvAcctBlock()}${rvDupBlock()}
+    ${R.pairs.length?`<div class="rvs"><h3>Transfers between your accounts <span class="s">${pairsOn} of ${R.pairs.length} ticked</span></h3>${pLook.length?`<p class="subtle">These might be money moving between your own accounts. Tick the ones that are, so they stay out of your spending and income.</p>${pLook.map(i=>pairRow(R.pairs[i],i)).join('')}`:''}
+      ${pDone.length?fold('pairs',R.showPairs,pDone.length+' transfer'+(pDone.length>1?'s':'')+' matched for you')+(R.showPairs?pDone.map(i=>pairRow(R.pairs[i],i)).join(''):''):''}</div>`:''}
+    <div class="rvs"><h3>Categories <span class="s">${look.length?look.length+' to check':'All sorted'}</span></h3>${look.length?`<p class="subtle">We could not place these with confidence. Change a category to fix every transaction in that group. Tick Always sort here and future imports do it for you.</p>${look.map(i=>grpRow(R.groups[i],i)).join('')}`:''}
+      ${done.length?fold('sorted',R.showSorted,doneTx+' transaction'+(doneTx>1?'s':'')+' already sorted into categories')+(R.showSorted?done.map(i=>grpRow(R.groups[i],i)).join(''):''):''}</div>
     <div class="row2 rvf"><button class="btn sec" data-rv="cancel">Cancel</button><button class="btn pri" data-rv="go" ${n?'':'disabled'}>Import ${n} transaction${n===1?'':'s'}</button></div>`;
 }
 function rvRegroup(){const old=RV.groups;RV.groups=groupStaged();RV.groups.forEach(g=>{const o=old.find(x=>x.k===g.k);if(o){g.remember=o.remember;g.rkey=o.rkey}});drawReview()}
@@ -2105,6 +2162,7 @@ function rvCommit(){
     // Banks like CommBank name every export the same, so only remember a file name that points to one account
     if(keyCount[k]===1&&map[k]!=='?')map[k]=map[k]&&map[k]!==nm?'?':nm;else map[k]='?';
     if(F.orig&&F.orig!==nm){const ids=new Set(F.matched.map(x=>x.id));R.staged.forEach(t=>{if(t.fi===F.fi&&t.dupOf&&!t.keep)ids.add(t.dupOf)});S.txns.forEach(x=>{if(ids.has(x.id)&&x.acct===F.orig){x.acct=nm;renamed++}})}
+    if(F.bank){const ab=S.settings.acctBank=S.settings.acctBank||{};ab[nm]=F.bank}
     if(SB.user&&BD.list.length){const ja=S.settings.jointAccts=S.settings.jointAccts||{};if(F.dest)ja[nm]=F.dest;else delete ja[nm]}
     R.staged.forEach(t=>{if(t.fi===F.fi)t.acct=nm})});
   if(RV0){S.settings.ownRefs=[...RV0.own.refs].slice(-40);S.settings.ownNames=[...RV0.own.names].slice(-10)}
@@ -2130,7 +2188,10 @@ $('#reviewModal').addEventListener('change',e=>{const t=e.target;if(!RV)return;
 $('#reviewModal').addEventListener('input',e=>{const t=e.target;if(!RV||t.dataset.rvkey==null)return;const g=RV.groups[+t.dataset.rvkey];g.rkey=t.value;const c=$('#rvr'+t.dataset.rvkey);if(c&&!c.checked&&t.value.trim()){c.checked=true;g.remember=true}});
 $('#reviewModal').addEventListener('click',e=>{const b=e.target.closest('[data-rv]');
   if(e.target.id==='reviewModal'||(b&&b.dataset.rv==='cancel')){$('#reviewModal').classList.remove('open');if(RV)toast('Import cancelled','Nothing was saved','info');RV=null;return}
-  if(b&&b.dataset.rv==='go')rvCommit()});
+  if(b&&b.dataset.rv==='go')rvCommit();
+  else if(b&&b.dataset.rv==='acct'){RV.acctOpen[b.dataset.i]=1;drawReview();const f=$('[data-rvacct="'+b.dataset.i+'"]');if(f){f.focus();f.select()}}
+  else if(b&&b.dataset.rv==='pairs'){RV.showPairs=!RV.showPairs;drawReview()}
+  else if(b&&b.dataset.rv==='sorted'){RV.showSorted=!RV.showSorted;drawReview()}});
 
 /* ============ Backup reminder and install ============ */
 const DAY=864e5;
@@ -2665,7 +2726,6 @@ function sorterOpen(tries){
   const cards=unknownCards();if(!cards.length){toast('Nothing to sort','Every transaction has a category','good');return}
   SO={cards,i:0,sorted:0,txs:0,remember:true};$('#sortModal').classList.add('open');drawSorter();
 }
-const prettyNote=n=>String(n||'').replace(/^own account:\s*/i,'').replace(/^(direct (debit|credit)|fast transfer)\s*\d*\s*/i,'').replace(/\s*\|.*$/,'').replace(/\s+\d{4,}\b.*$/,'').trim()||n;
 const sugLabel=s=>!s?'Keep in Other':s.cat==='__keep'?'Keep in Other':s.cat==='__transfer'?'Transfer':s.cat;
 function drawSorter(){
   const box=$('#sortBox');if(!SO)return;
@@ -2677,13 +2737,13 @@ function drawSorter(){
     <div class="swbar"><i style="width:${Math.round(SO.i/SO.cards.length*100)}%"></i></div>
     <div class="swstack"><div class="swcard" id="swCard">
       <span class="swtag l">Skip</span><span class="swtag r">${esc(sl)}</span>
-      <div class="swtop">${catChip(sinf,40)}<div class="grow"><div class="swname">${esc(c.paypal?'PayPal payments':prettyNote(t0.note))}</div><div class="sb">${c.items.length} transaction${c.items.length>1?'s':''} · ${inc?'+':''}${money(c.total,2)} · ${dLabel(dates[0])}${dates.length>1?' to '+dLabel(dates[dates.length-1]):''}${accts.length?' · '+esc(accts.join(', ')):''}</div></div></div>
+      <div class="swtop">${catChip(sinf,40)}<div class="grow"><div class="swname">${esc(c.paypal?'PayPal payments':merchName(t0.note))}</div><div class="sb">${c.items.length} transaction${c.items.length>1?'s':''} · ${inc?'+':''}${money(c.total,2)} · ${dLabel(dates[0])}${dates.length>1?' to '+dLabel(dates[dates.length-1]):''}${accts.length?' · '+esc(accts.join(', ')):''}</div></div></div>
       ${c.paypal?'<p class="swhint">PayPal does not say what you bought. Put them all in one category, or keep them in Other.</p>':''}
       <div class="swlist">${c.items.slice(0,3).map(x=>`<div><span>${dLabel(x.date)}</span><span class="grow">${esc(x.note)}</span><span>${inc?'+':''}${money(fullAmt(x),2)}</span></div>`).join('')}${c.items.length>3?`<div class="subtle">and ${c.items.length-3} more</div>`:''}</div>
       <div class="swsug">${c.sug?`Suggested: <b>${esc(sl)}</b> <span class="subtle">· ${esc(c.sug.why)}</span>`:'<span class="subtle">No good guess. Pick a category below.</span>'}</div>
     </div></div>
     <div class="catpick swcats">${Object.entries(src).map(([k,v])=>`<button type="button" data-so="cat" data-cat="${esc(k)}">${ic(v.i,18)}${esc(v.s||k)}</button>`).join('')}<button type="button" data-so="cat" data-cat="__transfer">${ic('swap',18)}Transfer</button></div>
-    <label class="swrem ${c.generic?'off':''}"><input type="checkbox" id="soRem" ${SO.remember&&!c.generic?'checked':''} ${c.generic?'disabled':''}>${c.generic?'Too general to remember, this sorts just these ones':`Sort future ${esc(c.paypal?'PayPal':prettyNote(t0.note))} transactions the same way`}</label>
+    <label class="swrem ${c.generic?'off':''}"><input type="checkbox" id="soRem" ${SO.remember&&!c.generic?'checked':''} ${c.generic?'disabled':''}>${c.generic?'Too general to remember, this sorts just these ones':`Sort future ${esc(c.paypal?'PayPal':merchName(t0.note))} transactions the same way`}</label>
     <div class="row2 swbtns"><button class="btn sec" data-so="skip">${ic('chevL',16)}Skip</button><button class="btn sec" data-so="keep">Keep in Other</button></div>
     <p class="subtle swkeys">Swipe the card, or use the arrow keys: left to skip, right for ${esc(sl)}.</p>`;
 }
@@ -2808,7 +2868,7 @@ document.addEventListener('change',e=>{const t=e.target;
     const n=S.txns.filter(x=>x.acct===a&&shOf('txns',x)).length;feedChanged(t.value?a+' now feeds '+bName(t.value):a+' is personal only',t.value?n+' transaction'+(n===1?'':'s')+' will show on the joint board, plus new imports':'Its transactions come off the joint board')}
   else if(t.dataset.jas!=null){const sp=S.settings.acctSplit=S.settings.acctSplit||{};if(+t.value>=100)delete sp[t.dataset.jas];else sp[t.dataset.jas]=+t.value;feedChanged('Split saved',t.dataset.jas+': '+splitWord(+t.value))}
   else if(t.dataset.ren!=null){const o=t.dataset.ren,nm=t.value.trim().slice(0,40);if(!nm||nm===o){t.value=o;return}let n=0;S.txns.forEach(x=>{if(x.acct===o){x.acct=nm;n++}});
-    ['jointAccts','acctSplit'].forEach(k=>{const m=S.settings[k];if(m&&m[o]!=null){m[nm]=m[o];delete m[o]}});(S.settings.shareRules||[]).forEach(r=>{if(r.f==='acct'&&r.v===o)r.v=nm});
+    ['jointAccts','acctSplit','acctBank'].forEach(k=>{const m=S.settings[k];if(m&&m[o]!=null){m[nm]=m[o];delete m[o]}});(S.settings.shareRules||[]).forEach(r=>{if(r.f==='acct'&&r.v===o)r.v=nm});
     const am=S.settings.acctMap||{};Object.keys(am).forEach(k=>{if(am[k]===o)am[k]=nm});feedChanged('Account renamed',n+' transaction'+(n===1?'':'s')+' moved to '+nm)}
   else if(t.id==='rfF'){RF.f=t.value;refreshShareCard()}
   else if(t.dataset.shsel){const w=t.closest('.shfield'),b=w&&w.querySelector('.shsplit');if(b)b.hidden=!t.value}
