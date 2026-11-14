@@ -508,6 +508,14 @@ button.pchip{cursor:pointer}
 .morecard{display:flex;align-items:center;gap:14px;width:100%;text-align:left;cursor:pointer;font:inherit;color:var(--muted);margin-bottom:16px}
 .morecard .nm{font-weight:600;color:var(--ink);font-size:14px}.morecard .sb{font-size:12.5px;color:var(--muted);margin-top:2px}
 .mof{display:none}@media (max-width:900px){.mof{display:block;font-size:11px;color:var(--muted);font-weight:400}}
+.txacts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:14px}
+.txsum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}.txsum div{background:var(--bg,#f5f6f8);border-radius:10px;padding:10px 12px}.txsum small{display:block;font-size:11.5px;color:var(--muted)}.txsum b{font-size:15px;font-weight:600;color:var(--ink)}.txsum b.pos{color:var(--accent)}
+.table tr.dayrow td{padding:16px 4px 6px;border-bottom:1px solid var(--line2);font-size:12.5px;background:none}.dayrow b{color:var(--ink);font-weight:600}.dayrow span{float:right;color:var(--muted)}
+.mshow{display:none}@media (max-width:900px){.mshow{display:inline}.txacts{justify-content:flex-start}
+  .top{display:grid!important;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"t bell" "ctl ctl";align-items:start;gap:12px}
+  .top .t{grid-area:t;min-width:0}.top #bellBtn{grid-area:bell}.top .ctl{grid-area:ctl;justify-self:start}
+  #toasts{bottom:calc(78px + env(safe-area-inset-bottom));right:84px}.toast small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}}
+.lvcard[hidden],#shareCard[hidden]{display:none!important}
 .planrow{margin-bottom:16px}.gadd{align-self:flex-start;margin-top:4px}.pl3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.pl3 .num{font-size:24px;margin-top:4px}.pl3 .muted{font-size:12px;margin-top:2px}@media (max-width:560px){.pl3 .num{font-size:19px}}
 .dgrid{align-items:start}.dgrid>.card{margin-bottom:0!important}.morecard .grow{flex:1}
 @media (max-width:900px){.player{grid-template-columns:1fr}.pside{flex-direction:row;border-left:0;padding-left:0;border-top:1px solid rgba(255,255,255,.1);padding-top:16px;gap:14px}.pchip{flex:1}.pchip .lvchip,.pchip .flame{width:36px;height:36px}.missions{grid-template-columns:repeat(3,minmax(0,1fr))}.missions .mt{grid-column:1/-1}.mis{flex-direction:column;align-items:flex-start;gap:8px;padding:10px}.mis .tx{white-space:normal;font-size:12.5px;line-height:1.3}}
@@ -1034,13 +1042,14 @@ const TIER={gold:['#f6d27a','#c8901e','#3a2706'],silver:['#eef1f5','#a3acba','#2
 const tierOf=xp=>xp>=250?'gold':xp>=150?'silver':'bronze';
 const medalBg=t=>'background:linear-gradient(145deg,'+TIER[t][0]+','+TIER[t][1]+');color:'+TIER[t][2];
 const MISSIONS=[{id:'log',t:'Log a transaction',xp:10,act:'add'},{id:'budget',t:'Check your budget',xp:5,act:'nav',view:'budgets'},{id:'goal',t:'Add to a savings goal',xp:10,act:'nav',view:'goals'}];
+function gameReveal(){if(gameOn()&&!S.flags.game){S.flags.game=1;}}
 const gameOn=()=>!!(S.flags.setup||S.txns.length||S.xp||S.goals.length);
 function getDaily(){const d=iso(new Date());if(!S.daily||S.daily.date!==d)S.daily={date:d,done:{}};return S.daily}
 function completeMission(id,el){
   const D=getDaily();if(D.done[id])return;D.done[id]=1;const m=MISSIONS.find(x=>x.id===id);
   const before=level();S.xp+=m.xp;if(el&&el.offsetParent)floatAt(el,'+'+m.xp+' XP');
   if(MISSIONS.every(x=>D.done[x.id])){S.xp+=25;notify('Perfect day','All three daily missions done. +25 bonus XP','win','xp');setTimeout(()=>showAch({kind:'day',title:'Perfect day',sub:'You completed every daily mission. Come back tomorrow for more.',xp:25+m.xp}),400)}
-  else toast('Mission complete: '+m.t,'+'+m.xp+' XP','win');
+  else if(id==='budget')toast('Mission complete: '+m.t,'+'+m.xp+' XP','win');
   checkLevel(before);save();
 }
 let ACHQ=[];
@@ -1155,14 +1164,14 @@ function remindCard(){
     <label class="field" style="max-width:260px">Bell shows<select class="inp" id="sNotif"><option value="important" ${notifAll()?'':'selected'}>Important only</option><option value="all" ${notifAll()?'selected':''}>Everything</option></select></label>
     <p class="muted" style="font-size:13px;margin:10px 0 18px">${notifAll()?'Everything adds budgets past 80%, repeating items logged, badges, levels and goal progress.':'Over budget, bills due, joint board invites, monthly reports and goals reached. Alerts that land together are rolled into one.'}</p>
     <label class="field" style="max-width:260px">Bill reminders<select class="inp" id="sRemind">${[[0,'Off'],[1,'1 day before'],[2,'2 days before'],[3,'3 days before'],[7,'A week before']].map(([v,l])=>`<option value="${v}" ${remindDays()===v?'selected':''}>${l}</option>`).join('')}</select></label>
-    <p class="muted" style="font-size:13px;margin:14px 0">Reminders come from your repeating expenses and show in the bell. Phone alerts pop up on this device too. ${SB.user?'Because you are signed in, they also come through at 7am each morning when the app is closed.':'Sign in and they will also come through at 7am each morning when the app is closed. Without signing in they only show while the app is open.'}</p>
+    <p class="muted" style="font-size:13px;margin:14px 0">Based on your repeating bills. ${SB.user?'Phone alerts also come through at 7am when the app is closed.':'Sign in to also get them at 7am when the app is closed.'}</p>
     ${!has?'<div class="recnote">This browser does not support alerts. On an iPhone, add Moneyboard to your home screen first, then open it from there.</div>':perm==='denied'?'<div class="recnote">Alerts are blocked for this site. Turn them on in your browser or phone settings, then come back here.</div>':on?`${SB.user&&!pushOn()&&canPush()?'<div class="recnote" style="margin:0 0 12px">Alerts are on while the app is open. Tap Turn off, then turn them back on to get alerts while it is closed too.</div>':''}<div style="display:flex;gap:8px;flex-wrap:wrap"><span class="pill ok" style="height:30px;padding:0 12px">${ic('check',13,2.4)}&nbsp;${pushOn()?'Alerts on, even when closed':'Phone alerts on'}</span><button class="btn sec sm" data-act="alertsOff">Turn off</button><button class="btn sec sm" data-act="alertsTest">Send a test</button></div>`:`<button class="btn sec" data-act="alertsOn">${ic('bell',16)}Turn on phone alerts</button>`}`;
 }
 
 function toast(title,body,kind){
   const k=KIND[kind]||KIND.info,el=document.createElement('div');el.className='toast';
   el.innerHTML='<span class="ni" style="background:'+k[2]+';color:'+k[1]+'">'+ic(k[0],15,2)+'</span><div><b>'+esc(title)+'</b>'+(body?'<small>'+esc(body)+'</small>':'')+'</div>';
-  $('#toasts').appendChild(el);setTimeout(()=>{el.classList.add('out');setTimeout(()=>el.remove(),300)},4500);renderTop();
+  el.onclick=()=>el.remove();$('#toasts').appendChild(el);setTimeout(()=>{el.classList.add('out');setTimeout(()=>el.remove(),300)},4500);renderTop();
 }
 
 /* ============ Celebration FX (badges, goals, levels only) ============ */
@@ -1363,17 +1372,19 @@ function gsCard(){
 }
 
 function txTable(list,del){
-  return `<table class="table"><thead><tr><th>Description</th><th class="hm">Category</th><th class="hm">Date</th><th class="r">Amount</th>${del?'<th style="width:36px"></th>':''}</tr></thead><tbody>${list.map(t=>{const ci=catInfo(t),inc=t.type==='income';const xf=t.type==='transfer';return `<tr class="clk" data-act="txEdit" data-id="${t.id}"><td><div class="desc">${catChip(ci)}<div><b>${esc(txName(t))}</b><div class="muted" style="font-size:12px">${t.goal?'Saved to goal':LINKED.has(t.id)?'Counted to '+esc((S.goals.find(g=>g.id===LINKED.get(t.id))||{}).name||'a goal'):xf?'Transfer':t.auto?'Repeating':inc?'Income':'Expense'}${shTag('txns',t)}</div></div></div></td><td class="hm"><span class="pill nt">${esc(catName(t.cat))}</span></td><td class="hm muted">${dLabel(t.date)}</td><td class="r"><span class="amt ${inc?'in':''}" ${xf?'style="color:var(--muted)"':''}>${xf?'':inc?'+':'-'}${money(t.amount,2)}</span></td>${del?`<td class="r">${BOARD&&t.from?`<span class="subtle" title="Shared from a personal board">${ic('users',15)}</span>`:`<button class="del" data-act="delTx" data-id="${t.id}" aria-label="Delete">${ic('trash',15)}</button>`}</td>`:''}</tr>`}).join('')}</tbody></table>`;
+  const cols=del?5:4,today=iso(new Date()),yest=addDays(today,-1);let lastD='';
+  const dayHead=d=>{const out=list.filter(x=>x.date===d&&x.type==='expense').reduce((a,x)=>a+x.amount,0);return `<tr class="dayrow"><td colspan="${cols}"><b>${d===today?'Today':d===yest?'Yesterday':new Date(d+'T00:00').toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'short'})}</b>${out?`<span>${money(out,2)} spent</span>`:''}</td></tr>`};
+  return `<table class="table"><thead><tr><th>Description</th><th class="hm">Category</th><th class="hm">Date</th><th class="r">Amount</th>${del?'<th style="width:36px"></th>':''}</tr></thead><tbody>${list.map(t=>{const ci=catInfo(t),inc=t.type==='income';const xf=t.type==='transfer';const hd=del&&t.date!==lastD?dayHead(t.date):'';lastD=t.date;return hd+`<tr class="clk" data-act="txEdit" data-id="${t.id}"><td><div class="desc">${catChip(ci)}<div><b>${esc(txName(t))}</b><div class="muted" style="font-size:12px">${t.goal?'Saved to goal':LINKED.has(t.id)?'Counted to '+esc((S.goals.find(g=>g.id===LINKED.get(t.id))||{}).name||'a goal'):xf?'Transfer':t.auto?'Repeating<span class="mshow"> · '+esc(catName(t.cat))+'</span>':'<span class="mshow">'+esc(catName(t.cat))+'</span>'}${del?'':'<span class="mshow"> · '+dLabel(t.date)+'</span>'}${shTag('txns',t)}</div></div></div></td><td class="hm"><span class="pill nt">${esc(catName(t.cat))}</span></td><td class="hm muted">${dLabel(t.date)}</td><td class="r"><span class="amt ${inc?'in':''}" ${xf?'style="color:var(--muted)"':''}>${xf?'':inc?'+':'-'}${money(t.amount,2)}</span></td>${del?`<td class="r">${BOARD&&t.from?`<span class="subtle" title="Shared from a personal board">${ic('users',15)}</span>`:`<button class="del" data-act="delTx" data-id="${t.id}" aria-label="Delete">${ic('trash',15)}</button>`}</td>`:''}</tr>`}).join('')}</tbody></table>`;
 }
 
 let F={q:'',type:'all',cat:'all'};
 V.transactions=()=>`
   <div class="card">
+    <div class="txacts">${(n=>n?`<button class="btn sec sm" data-act="sortOpen">${ic('spark',15)}Sort ${n} unknown</button>`:'')(unknownList().length)}<label class="btn sec sm" style="cursor:pointer">${ic('upload',15)}Import bank CSV<input type="file" accept=".csv,text/csv" id="bankFile" multiple hidden></label></div>
     <div class="toolbar">
       <label class="search">${ic('search',16)}<input id="fq" placeholder="Search transactions" value="${esc(F.q)}"></label>
       <div class="segc" id="ftype">${[['all','All'],['expense','Expenses'],['income','Income'],['transfer','Transfers']].map(([k,l])=>`<button data-ft="${k}" class="${F.type===k?'on':''}">${l}</button>`).join('')}</div>
       <select class="inp" id="fc"><option value="all">All categories</option>${[...Object.keys(CATS),...Object.keys(INCATS)].map(c=>`<option value="${esc(c)}" ${F.cat===c?'selected':''}>${esc(catName(c))}</option>`).join('')}</select>
-      ${(n=>n?`<button class="btn sec" data-act="sortOpen">${ic('spark',16)}Sort ${n} unknown</button>`:'')(unknownList().length)}<label class="btn sec" style="cursor:pointer">${ic('upload',16)}Import CSV<input type="file" accept=".csv,text/csv" id="bankFile" multiple hidden></label>
     </div>
     <div id="txList"></div>
   </div>
@@ -1446,7 +1457,7 @@ function renderTxList(){
   const q=F.q.toLowerCase();
   const list=monthTx(S.month).filter(t=>(F.type==='all'||t.type===F.type)&&(F.cat==='all'||t.cat===F.cat)&&(!q||(t.note||'').toLowerCase().includes(q)||txName(t).toLowerCase().includes(q)||t.cat.toLowerCase().includes(q)||catName(t.cat).toLowerCase().includes(q))).sort((a,b)=>b.date.localeCompare(a.date));
   const inc=list.filter(t=>t.type==='income').reduce((a,t)=>a+t.amount,0),exp=list.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
-  $('#txList').innerHTML=list.length?`<div style="display:flex;gap:24px;margin-bottom:16px;font-size:13px;flex-wrap:wrap"><span class="muted">${list.length} transactions in ${ymLabel(S.month)}</span><span style="margin-left:auto">In <b class="pos" style="font-weight:600">${money(inc,2)}</b></span><span>Out <b style="font-weight:600;color:var(--ink)">${money(exp,2)}</b></span></div>`+txTable(list,true):empty('search','Nothing matches for this month');
+  $('#txList').innerHTML=list.length?`<div class="txsum"><div><small>In</small><b class="pos">${money(inc,2)}</b></div><div><small>Out</small><b>${money(exp,2)}</b></div><div><small>Count</small><b>${list.length}</b></div></div>`+txTable(list,true):empty('search','Nothing matches for this month');
 }
 
 let OPEN=new Set();
@@ -1584,7 +1595,7 @@ function renderCut(){
 V.settings=()=>`
   <div class="grid c2">
     <div class="card" id="acctCard">${acctCard()}</div>
-    <div class="card" id="shareCard">${shareCard()}</div>
+    <div class="card" id="shareCard" ${SB.user?'':'hidden'}>${shareCard()}</div>
     <div class="card"><div class="ch"><h3>Preferences</h3></div>
       <label class="field" style="max-width:260px">Currency<select class="inp" id="sCur">${['AUD','NZD','USD','GBP','EUR','CAD'].map(c=>`<option ${S.settings.currency===c?'selected':''}>${c}</option>`).join('')}</select></label>
       <p class="muted" style="margin-top:16px;font-size:13px">${SB.user?'Your data is saved in this browser and synced to your account.':'Your data is stored in this browser only. Sign in to sync it, or export a backup from time to time.'}</p>
@@ -1757,6 +1768,7 @@ function renderNav(){
   $('#msheet').innerHTML=extra.map(navBtn).join('');
 }
 function renderTop(){
+  $('#lvcard').hidden=!gameOn();
   const l=level(),into=S.xp%LEVEL_XP,st=streak();
   $('#lvcard').innerHTML=`<div class="r"><b>Level ${l}</b><small>${into}/${LEVEL_XP} XP</small></div>${bar(into/LEVEL_XP,XPC,5)}<div class="streakline">${ic('flame',14)}${st} day streak · ${levelTitle(l)}</div>`;
   requestAnimationFrame(()=>document.querySelectorAll('#lvcard [data-w]').forEach(e=>e.style.width=e.dataset.w+'%'));
@@ -1784,7 +1796,7 @@ function animate(quiet){
   document.querySelectorAll('[data-count]').forEach(el=>{const to=+el.dataset.count,f=el.dataset.fmt,t0=performance.now(),dur=(reduce||quiet)?1:900;
     const step=now=>{const k=clamp((now-t0)/dur),e=1-Math.pow(1-k,3);el.textContent=fmtVal(to*e,f);if(k<1)requestAnimationFrame(step)};requestAnimationFrame(step)});
 }
-function commit(){applyAutoSplits();syncGoalLinks();checkAlerts();evalChallenges();save();render(true)}
+function commit(){gameReveal();applyAutoSplits();syncGoalLinks();checkAlerts();evalChallenges();save();render(true)}
 
 /* ============ Static chrome ============ */
 $('#brandMark').innerHTML=ic('logo',16,2.2);$('#wMark').innerHTML=ic('logo',26,2.2);$('#mPrev').innerHTML=ic('chevL',16);$('#mNext').innerHTML=ic('chevR',16);
@@ -1795,7 +1807,7 @@ let fType='expense',fCat='Groceries',MM={mode:'new',id:null};
 function openModal(mode,id){
   mode=mode||'new';const t=mode==='edit'?S.txns.find(x=>x.id===id):mode==='rule'?S.recurring.find(x=>x.id===id):null;
   if(mode!=='new'&&!t)return;MM={mode,id:t?t.id:null};
-  fType=t?t.type:'expense';fCat=t?t.cat:'Groceries';$('#fAmount').value=t?(t.full??t.amount):'';$('#fNote').value=t?(t.note||''):'';$('#curSym').textContent=curSymbol();
+  fType=t?t.type:'expense';fCat=t?t.cat:(CATS[S.settings.lastCat]?S.settings.lastCat:'Groceries');$('#fAmount').value=t?(t.full??t.amount):'';$('#fNote').value=t?(t.note||''):'';$('#curSym').textContent=curSymbol();
   $('#fDate').value=mode==='edit'?t.date:mode==='rule'?t.next:(S.month===curYM()?iso(new Date()):S.month+'-01');
   $('#fDateLab').textContent=mode==='rule'?'Next date':'Date';
   $('#mTitle').textContent=mode==='edit'?'Edit transaction':mode==='rule'?'Edit repeating item':'New transaction';
@@ -1844,6 +1856,7 @@ $('#txForm').addEventListener('submit',e=>{
   S.txns.push(t);$('#modal').classList.remove('open');
   if(rep!=='none'){const r={id:uid(),type:fType,amount:amt,cat:fCat,note,freq:rep,day:+date.slice(8)};r.next=nextDate(date,rep,r.day);readShare('fShare','recurring',r);if(r.full!=null){t.full=r.full;t.amount=r.amount;t.sp='auto'}t.rec=r.id;S.recurring.push(r);recurringNotice(runRecurring())}
   else readShare('fShare','txns',t);
+  if(t.type==='expense')S.settings.lastCat=t.cat;
   toast(t.type==='income'?'Income added':'Expense added',(t.type==='income'?'+':'')+money(amt,2)+' · '+catName(t.cat)+(rep!=='none'?' · repeats':''),'good');
   S.month=t.date.slice(0,7);const xb=$('#addBtn').offsetParent?$('#addBtn'):$('#fab');gainXP(5,xb);completeMission('log');commit();
 });
@@ -2364,7 +2377,7 @@ function renderSync(){
   refreshShareCard();renderBoardSw();
 }
 function acctCard(){
-  if(!SB.user)return `<div class="ch"><h3>Account and sync</h3></div><p class="muted" style="font-size:13px;margin-bottom:14px">Optional. Sign in to back up your data to the cloud and use Moneyboard on your phone and computer with the same data.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" data-act="authOpen">${ic('cloud',16)}Sign in</button><button class="btn sec" data-act="authOpen" data-mode="up">Create account</button></div>`;
+  if(!SB.user)return `<div class="ch"><h3>Account and sync</h3></div><p class="muted" style="font-size:13px;margin-bottom:14px">Optional. Sign in to keep a backup, use Moneyboard on your phone and computer, and share a joint board with a partner.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" data-act="authOpen">${ic('cloud',16)}Sign in</button><button class="btn sec" data-act="authOpen" data-mode="up">Create account</button></div>`;
   return `<div class="ch"><h3>Account and sync</h3><span class="pill ${SB.status==='error'?'bad':SB.status==='synced'||SB.status==='off'?'ok':'warn'}">${syncLabel()}</span></div><p style="font-size:13px;margin-bottom:4px;color:var(--ink);font-weight:500">${esc(SB.user.email)}</p><p class="muted" style="font-size:12.5px;margin-bottom:14px">${S.syncAt?'Last synced '+new Date(S.syncAt).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'Not synced yet'}. Changes save to your account automatically.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" data-act="syncNow">${ic('refresh',16)}Sync now</button><button class="btn sec" data-act="signOut">Sign out</button></div>`;
 }
 function schedulePush(){if(!SB.user)return;clearTimeout(SB.timer);SB.status!=='syncing'&&setSync('pending');SB.timer=setTimeout(pushNow,1500)}
@@ -2559,10 +2572,10 @@ function renderBoardSw(){
     ${BD.invites.length?`<div class="bdh">Invites</div>${BD.invites.map(x=>`<div class="bdinv"><div><b>${esc(x.board_name)}</b><small>From ${esc(x.inviter_email||'someone')}</small></div><div class="r"><button class="btn pri sm" data-act="invAccept" data-id="${x.id}">Join</button><button class="btn sec sm" data-act="invDecline" data-id="${x.id}">Decline</button></div></div>`).join('')}`:''}
     <div class="bdsep"></div><button class="bdi" data-act="boardNew">${ic('plus',16)}<span class="grow"><b>New joint board</b></span></button><button class="bdi" data-act="boardManage">${ic('sliders',16)}<span class="grow"><b>Manage sharing</b></span></button>`;
 }
-function refreshShareCard(){const c=$('#shareCard');if(c)c.innerHTML=shareCard()}
+function refreshShareCard(){const c=$('#shareCard');if(c){c.innerHTML=shareCard();c.hidden=!SB.user}}
 function shareCard(){
   const h='<div class="ch"><h3>Sharing</h3>'+(BOARD?'<span class="pill ok">Joint board</span>':'<span class="pill nt">Personal board</span>')+'</div>';
-  if(!SB.user)return h+`<p class="muted" style="font-size:13px;margin-bottom:14px">Sign in to share a joint board with your partner or housemate. You each keep your own login and your personal board stays private.</p><button class="btn pri" data-act="authOpen">${ic('cloud',16)}Sign in</button>`;
+  if(!SB.user)return '';
   const inv=BD.invites.length?`<div class="shsec"><div class="eyebrow" style="margin-bottom:6px">Invites waiting for you</div>${BD.invites.map(x=>`<div class="lrow">${catChip({i:'mail',c:'#3f63a8'},30)}<div class="grow"><div class="nm" style="font-size:13px">${esc(x.board_name)}</div><div class="sb">From ${esc(x.inviter_email||'someone')}</div></div><button class="btn pri sm" data-act="invAccept" data-id="${x.id}">Join</button><button class="btn sec sm" data-act="invDecline" data-id="${x.id}">Decline</button></div>`).join('')}</div>`:'';
   if(!BOARD){
     return h+inv+`<p class="muted" style="font-size:13px;margin-bottom:12px">This is your personal board and only you can see it. A joint board is a separate board you share with someone else. You both see and edit the same budget, bills and transactions, each with your own login.</p>
@@ -3051,7 +3064,7 @@ document.addEventListener('keydown',e=>{
 });
 
 /* ============ Boot ============ */
-cleanNotifs();const bootRec=runRecurring();recurringNotice(bootRec,true);
+if(gameOn())S.flags.game=1;cleanNotifs();const bootRec=runRecurring();recurringNotice(bootRec,true);
 checkAlerts(true);evalChallenges(true);save(true);render();renderSync();sbLoad();
 document.addEventListener('visibilitychange',()=>{if(document.hidden){if(SB.user&&(S.savedAt||0)>(S.syncAt||0))pushNow();return}const bills=()=>{const c=Object.keys(S.alerted).length;checkBills();if(Object.keys(S.alerted).length!==c){save();render(true)}};if(SB.user){refreshBoards();pull().then(bills);return}const n=runRecurring();if(n){recurringNotice(n);commit()}else bills()});
 addEventListener('online',()=>{if(SB.user)pull()});
