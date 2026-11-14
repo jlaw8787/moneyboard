@@ -518,6 +518,7 @@ button.pchip{cursor:pointer}
 .lvcard[hidden],#shareCard[hidden]{display:none!important}
 .wrap{display:flex;align-items:center;gap:14px;margin-bottom:16px}.wrap .eb{font-size:11.5px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.04em}.wrap .nm{font-weight:600;color:var(--ink);font-size:14.5px;margin-top:2px}.wrap .sb{font-size:12.5px;color:var(--muted);margin-top:2px}.wrap.good{background:linear-gradient(135deg,#fffaf0,#fff);border-color:#f3e2bd}
 @media (max-width:560px){.wrap{flex-wrap:wrap}.wrap .grow{flex-basis:calc(100% - 60px)}.wrap .btn{margin-left:54px}}
+.cashg svg{max-height:250px;width:100%}
 .planrow{margin-bottom:16px}.gadd{align-self:flex-start;margin-top:4px}.pl3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.pl3 .num{font-size:24px;margin-top:4px}.pl3 .muted{font-size:12px;margin-top:2px}@media (max-width:560px){.pl3 .num{font-size:19px}}
 .dgrid{align-items:start}.dgrid>.card{margin-bottom:0!important}.morecard .grow{flex:1}
 @media (max-width:900px){.player{grid-template-columns:1fr}.pside{flex-direction:row;border-left:0;padding-left:0;border-top:1px solid rgba(255,255,255,.1);padding-top:16px;gap:14px}.pchip{flex:1}.pchip .lvchip,.pchip .flame{width:36px;height:36px}.missions{grid-template-columns:repeat(3,minmax(0,1fr))}.missions .mt{grid-column:1/-1}.mis{flex-direction:column;align-items:flex-start;gap:8px;padding:10px}.mis .tx{white-space:normal;font-size:12.5px;line-height:1.3}}
@@ -1782,7 +1783,7 @@ V.report=()=>{
     </tbody></table></div>`:''}
   ${repTrends()}`;
 };
-function repTrends(){const P=dashParts();return `<div class="ch" style="margin:8px 0 12px"><h3>Trends</h3></div><div class="grid w21">${P.pace}${P.health}</div>${P.insights}<div class="grid">${P.cash}</div>`}
+function repTrends(){const P=dashParts();return `<div class="ch" style="margin:8px 0 12px"><h3>Trends</h3></div><div class="grid w21">${P.pace}${P.health}</div>${P.insights}<div class="grid cashg">${P.cash}</div>`}
 
 /* ============ Render ============ */
 const SUBS={dashboard:()=>ymLabel(S.month)+' overview',transactions:()=>'Every dollar in and out',budgets:()=>'Your budget, tracked week by week',report:()=>'Where your money went in '+ymLabel(S.month,'m'),goals:()=>'Savings goals and progress',challenges:()=>'Badges, XP and levels',planner:()=>'Projections and what-ifs',settings:()=>'Backup, restore and preferences'};
