@@ -520,6 +520,7 @@ button.pchip{cursor:pointer}
 @media (max-width:560px){.wrap{flex-wrap:wrap}.wrap .grow{flex-basis:calc(100% - 60px)}.wrap .btn{margin-left:54px}}
 .cashg svg{max-height:250px;width:100%}
 .planrow{margin-bottom:16px}.gadd{align-self:flex-start;margin-top:4px}.pl3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.pl3 .num{font-size:24px;margin-top:4px}.pl3 .muted{font-size:12px;margin-top:2px}@media (max-width:560px){.pl3 .num{font-size:19px}}
+.arow{display:flex;gap:12px;margin-top:12px}.arow>.field{flex:1;min-width:0}.acard{margin-bottom:16px}.acctot{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;padding:2px 0 12px;margin-bottom:4px;border-bottom:1px solid var(--line2)}.acctot .num{font-weight:600;color:var(--ink);letter-spacing:-.01em}.acctot .num.neg{color:var(--neg)}.acard .lrow.ahid{opacity:.55}.acard .lrow .sb{white-space:normal}.acard .lrow:last-of-type{border-bottom:0}
 .dgrid{align-items:start}.dgrid>.card{margin-bottom:0!important}.morecard .grow{flex:1}
 @media (max-width:900px){.player{grid-template-columns:1fr}.pside{flex-direction:row;border-left:0;padding-left:0;border-top:1px solid rgba(255,255,255,.1);padding-top:16px;gap:14px}.pchip{flex:1}.pchip .lvchip,.pchip .flame{width:36px;height:36px}.missions{grid-template-columns:repeat(3,minmax(0,1fr))}.missions .mt{grid-column:1/-1}.mis{flex-direction:column;align-items:flex-start;gap:8px;padding:10px}.mis .tx{white-space:normal;font-size:12.5px;line-height:1.3}}
 @media (max-width:420px){.pchip small{font-size:11px}.player .safe{font-size:38px}}
@@ -620,6 +621,7 @@ button.pchip{cursor:pointer}
         <label class="field">Note<input class="inp" id="fNote" type="text" maxlength="60" placeholder="Optional"></label>
       </div>
       <label class="field" id="fRepRow" style="margin-top:12px">Repeats<select class="inp" id="fRepeat"><option value="none">Does not repeat</option><option value="weekly">Every week</option><option value="fortnightly">Every fortnight</option><option value="monthly">Every month</option><option value="quarterly">Every quarter</option><option value="yearly">Every year</option></select></label>
+      <div class="arow" id="fAcctRow" style="display:none"><label class="field"><span id="fAcctLab">Account</span><select class="inp" id="fAcct"></select></label><label class="field" id="fToWrap">Into account<select class="inp" id="fTo"></select></label></div>
       <div id="fShareRow"></div>
       <div class="recnote" id="fInfo" style="display:none"></div>
       <div class="recnote" id="fRuleRow" style="display:none"><label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-weight:500;cursor:pointer"><input type="checkbox" id="fRuleOn" style="accent-color:var(--accent);width:16px;height:16px">Remember this for future imports</label><div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap"><span>Match notes containing</span><input class="inp" id="fRuleKey" maxlength="40" style="height:30px;flex:1;min-width:120px;font-size:13px"></div></div>
@@ -845,7 +847,7 @@ const catInfo = t => t.type==='transfer'?XFER:(t.type==='income'?INCATS[t.cat]:C
 const catChip = (inf,s=32) => '<span class="cat" style="width:'+s+'px;height:'+s+'px;background:'+inf.c+'14;color:'+inf.c+'">'+ic(inf.i,s>30?16:14)+'</span>';
 
 /* ============ State ============ */
-function fresh(){return {txns:[],items:[],recurring:[],rules:[],period:'week',goals:[],xp:0,unlocked:{},notifs:[],alerted:{},flags:{},settings:{currency:'AUD'},view:'dashboard',month:curYM()}}
+function fresh(){return {txns:[],items:[],recurring:[],rules:[],period:'week',goals:[],accts:{},xp:0,unlocked:{},notifs:[],alerted:{},flags:{},settings:{currency:'AUD'},view:'dashboard',month:curYM()}}
 function load(){try{const s=localStorage.getItem(lkey());return s?JSON.parse(s):null}catch(e){return null}}
 const sig = () => JSON.stringify(S,(k,v)=>k==='view'||k==='month'||k==='savedAt'||k==='syncAt'||k==='syncUid'?undefined:v);
 let lastSig='';
@@ -859,6 +861,7 @@ try{const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;if(tz&&S.settings.
 
 function seed(){
   const now=new Date(), rnd=(a,b)=>Math.round(a+Math.random()*(b-a)), pick=a=>a[Math.floor(Math.random()*a.length)];
+  S.accts={Everyday:{kind:'bank',bal:2184.6,at:iso(now),src:'me'},'Rainy day saver':{kind:'savings',bal:6420,at:iso(now),src:'me'},Visa:{kind:'credit',bal:-612.35,at:iso(now),src:'me'}};
   const add=(d,type,amount,cat,note)=>S.txns.push({id:uid(),date:iso(d),type,amount,cat,note});
   for(let k=5;k>=0;k--){
     const y=now.getFullYear(), m=now.getMonth()-k, N=new Date(y,m+1,0).getDate(), last=k===0?now.getDate():N;
@@ -1002,7 +1005,7 @@ function nextDate(d,f,day){
 }
 function runRecurring(){
   const today=iso(new Date());let n=0;
-  (S.recurring||[]).forEach(r=>{if(r.watch){const late=addDays(today,-5);let g=0;while(r.next<late&&g<500){r.next=nextDate(r.next,r.freq,r.day);g++}return}let g=0;while(r.next<=today&&g<500){const rid='r-'+r.id+'-'+r.next;if(!S.txns.some(x=>x.id===rid))S.txns.push(Object.assign({id:rid,date:r.next,type:r.type,amount:r.amount,cat:r.cat,note:r.note,rec:r.id,auto:true},r.full!=null?{full:r.full,sp:'auto'}:{}));r.next=nextDate(r.next,r.freq,r.day);n++;g++}});
+  (S.recurring||[]).forEach(r=>{if(r.watch){const late=addDays(today,-5);let g=0;while(r.next<late&&g<500){r.next=nextDate(r.next,r.freq,r.day);g++}return}let g=0;while(r.next<=today&&g<500){const rid='r-'+r.id+'-'+r.next;if(!S.txns.some(x=>x.id===rid))S.txns.push(Object.assign({id:rid,date:r.next,type:r.type,amount:r.amount,cat:r.cat,note:r.note,rec:r.id,auto:true},r.full!=null?{full:r.full,sp:'auto'}:{},r.acct?{acct:r.acct}:{},r.to?{to:r.to}:{}));r.next=nextDate(r.next,r.freq,r.day);n++;g++}});
   return n;
 }
 function recurringNotice(n,quiet){if(!n)return;const b='Repeating items were added on their due dates';notify(n+' repeating transaction'+(n>1?'s':'')+' logged',b,'info','routine');if(!quiet)toast(n+' repeating transaction'+(n>1?'s':'')+' logged',b,'info')}
@@ -1371,6 +1374,7 @@ V.dashboard=()=>{
   <div class="card quiet"><div style="display:flex;justify-content:center">${catChip({i:'trend',c:'#0e7a5c'},44)}</div><h3 style="margin-top:12px">Your charts start here</h3><p class="muted">Add or import a few transactions and this fills up with your week, your bills and your budgets.</p></div>`;
   return `${backupBanner()}${gsCard()}${P.player}${weekWrap()}${reportNudge()}
   <div class="grid c2 dgrid">${P.week}${P.bud}</div>
+  ${balCard()}
   <div class="grid c2 dgrid">${billsCard()}${P.recent}</div>
   <button class="card morecard" data-act="nav" data-view="report">${catChip({i:'book',c:'#0e7a5c'},36)}<div class="grow"><div class="nm">Want the full picture?</div><div class="sb">Spending pace, insights, trends and your money health score are in Report</div></div>${ic('chevR',18)}</button>`;
 
@@ -1846,9 +1850,18 @@ function openModal(mode,id){
   $('#fDelWrap').style.display=mode==='new'?'none':'';$('#fDel').textContent=mode==='rule'?'Stop repeating':'Delete transaction';
   MM.bank=!!(t&&t.src==='bank');const showRule=mode==='edit'&&!!(t.note||'').trim()&&!t.goal;$('#fRuleRow').style.display=showRule?'':'none';$('#fRuleOn').checked=false;
   if(showRule){const ex=findRule(t.note);$('#fRuleKey').value=ex?ex.match:suggestKey(t.note)}
-  drawCats();$('#modal').classList.add('open');setTimeout(()=>$('#fAmount').focus(),50);
+  fillAccts(mode,t);drawCats();$('#modal').classList.add('open');setTimeout(()=>$('#fAmount').focus(),50);
 }
+/* Which account a manual entry comes out of (and goes into, for a transfer), so balances move with it */
+function fillAccts(mode,t){
+  const names=acctNames(),show=!BOARD&&names.length&&!(t&&(t.src==='bank'||t.from));$('#fAcctRow').style.display=show?'':'none';MM.acct=!!show;if(!show)return;
+  const cur=t?(t.acct||''):(names.includes(S.settings.lastAcct)?S.settings.lastAcct:''),to=t?(t.to||''):'';
+  const opts=v=>'<option value="">No account</option>'+names.map(n=>`<option value="${esc(n)}" ${n===v?'selected':''}>${esc(n)}</option>`).join('');
+  $('#fAcct').innerHTML=opts(cur);$('#fTo').innerHTML=opts(to);
+}
+function acctPick(o){if(!MM.acct)return;const a=$('#fAcct').value,to=$('#fTo').value;if(a)o.acct=a;else delete o.acct;if(fType==='transfer'&&to&&to!==a)o.to=to;else delete o.to}
 function drawCats(){
+  $('#fToWrap').style.display=fType==='transfer'?'':'none';$('#fAcctLab').textContent=fType==='transfer'?'From account':fType==='income'?'Paid into':'Paid from';
   document.querySelectorAll('#typeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.type===fType));
   $('#fCats').style.display=fType==='transfer'?'none':'';
   if(fType==='transfer'){fCat='Transfer';$('#fSave').textContent=MM.mode!=='new'?'Save changes':'Add transfer';return}
@@ -1866,7 +1879,7 @@ $('#txForm').addEventListener('submit',e=>{
   if(MM.mode==='edit'){
     const t=S.txns.find(x=>x.id===MM.id);if(!t)return;
     if(t.goal){const g=S.goals.find(x=>x.id===t.goal),keep=fType==='expense'&&fCat==='Savings';if(g){const d=(keep?amt:0)-t.amount;g.saved=Math.max(0,Math.round((g.saved+d)*100)/100);if(g.from)g.extra=Math.max(0,Math.round(((+g.extra||0)+d)*100)/100)}if(!keep)delete t.goal}
-    const wasSplit=t.full!=null&&t.sp!=='me'?splitPct('txns',t):100;if(t.src==='bank'&&note!==(t.note||''))t.named=1;Object.assign(t,{type:fType,amount:amt,cat:fCat,date,note});delete t.full;if($('#fShare'))readShare('fShare','txns',t);else if(wasSplit<100)setSplit('txns',t,wasSplit,'auto');$('#modal').classList.remove('open');
+    const wasSplit=t.full!=null&&t.sp!=='me'?splitPct('txns',t):100;if(t.src==='bank'&&note!==(t.note||''))t.named=1;Object.assign(t,{type:fType,amount:amt,cat:fCat,date,note});delete t.full;acctPick(t);if($('#fShare'))readShare('fShare','txns',t);else if(wasSplit<100)setSplit('txns',t,wasSplit,'auto');$('#modal').classList.remove('open');
     const key=normNote($('#fRuleKey').value);
     if($('#fRuleRow').style.display!=='none'&&$('#fRuleOn').checked&&key){
       S.rules=(S.rules||[]).filter(r=>r.match!==key);S.rules.push({id:uid(),match:key,type:fType,cat:fCat});
@@ -1877,12 +1890,12 @@ $('#txForm').addEventListener('submit',e=>{
   }
   if(MM.mode==='rule'){
     const r=S.recurring.find(x=>x.id===MM.id);if(!r)return;
-    Object.assign(r,{type:fType,amount:amt,cat:fCat,note,freq:rep==='none'?r.freq:rep,next:date,day:+date.slice(8)});delete r.full;readShare('fShare','recurring',r);
+    Object.assign(r,{type:fType,amount:amt,cat:fCat,note,freq:rep==='none'?r.freq:rep,next:date,day:+date.slice(8)});delete r.full;acctPick(r);readShare('fShare','recurring',r);
     $('#modal').classList.remove('open');recurringNotice(runRecurring());toast('Repeating item updated',(note||catName(fCat))+', next on '+dLabel(r.next),'good');commit();return;
   }
-  const t={id:uid(),date,type:fType,amount:amt,cat:fCat,note};
+  const t={id:uid(),date,type:fType,amount:amt,cat:fCat,note,ts:Date.now()};acctPick(t);if(MM.acct)S.settings.lastAcct=t.acct||'';
   S.txns.push(t);$('#modal').classList.remove('open');
-  if(rep!=='none'){const r={id:uid(),type:fType,amount:amt,cat:fCat,note,freq:rep,day:+date.slice(8)};r.next=nextDate(date,rep,r.day);readShare('fShare','recurring',r);if(r.full!=null){t.full=r.full;t.amount=r.amount;t.sp='auto'}t.rec=r.id;S.recurring.push(r);recurringNotice(runRecurring())}
+  if(rep!=='none'){const r={id:uid(),type:fType,amount:amt,cat:fCat,note,freq:rep,day:+date.slice(8)};acctPick(r);r.next=nextDate(date,rep,r.day);readShare('fShare','recurring',r);if(r.full!=null){t.full=r.full;t.amount=r.amount;t.sp='auto'}t.rec=r.id;S.recurring.push(r);recurringNotice(runRecurring())}
   else readShare('fShare','txns',t);
   if(t.type==='expense')S.settings.lastCat=t.cat;
   toast(t.type==='income'?'Income added':'Expense added',(t.type==='income'?'+':'')+money(amt,2)+' · '+catName(t.cat)+(rep!=='none'?' · repeats':''),'good');
@@ -1897,11 +1910,87 @@ function goalMilestones(g,quiet){
     else{notify(g.name+' is '+m+'% funded',money(g.saved)+' of '+money(g.target),'good','goalstep');if(!quiet)toast(g.name+' is '+m+'% funded',money(g.saved)+' of '+money(g.target),'good')}}}
   return ms;
 }
+/* ============ Account balances ============ */
+/* A balance is kept as "this much on this date". Transactions in that account dated after it move it up or down.
+   Bank statements with a balance column set it on their own; you can also set it by hand. */
+const AKIND={bank:['Bank account','bank','#3f63a8'],savings:['Savings','gem','#0e7a5c'],credit:['Credit card','card','#b4553a'],loan:['Loan','percent','#8a5a9e'],cash:['Cash','wallet','#69707d'],invest:['Investments or super','trend','#2c7a8c']};
+const isDebt=k=>k==='credit'||k==='loan';
+function guessKind(n,b){n=String(n||'').toLowerCase();return /credit|card|visa|mastercard|amex/.test(n)?'credit':/loan|mortgage/.test(n)?'loan':/sav|saver|bonus|goal|reward|netsave|maxi|offset/.test(n)?'savings':/cash|wallet/.test(n)?'cash':/super|invest|shares|etf/.test(n)?'invest':b<0?'credit':'bank'}
+/* Which row in a statement is the latest? Check which order the running balance adds up in, then fall back to the dates */
+function pickBal(B){if(!B.length)return null;if(B.length===1)return {v:B[0][2],d:B[0][0]};let fw=0,bw=0;
+  for(let i=1;i<B.length;i++){if(Math.abs(B[i][2]-(B[i-1][2]+B[i][1]))<.011)fw++;if(Math.abs(B[i-1][2]-(B[i][2]+B[i-1][1]))<.011)bw++}
+  const oldFirst=fw>bw||(fw===bw&&B[0][0]<=B[B.length-1][0]),r=oldFirst?B[B.length-1]:B[0];return {v:Math.round(r[2]*100)/100,d:r[0]}}
+/* Save the latest balance each statement showed, unless a newer one is already set */
+function applyBals(files){let n=0;S.accts=S.accts||{};files.forEach(F=>{const nm=(F.name||'').trim();if(!F.bal||!nm)return;const A=S.accts[nm]=S.accts[nm]||{};
+  if((!A.at||F.bal.d>=A.at)&&(A.bal!==F.bal.v||A.at!==F.bal.d||A.src!=='bank')){n++;A.bal=F.bal.v;A.at=F.bal.d;A.src='bank';A.ts=Date.now()}if(!A.kind)A.kind=guessKind(nm,F.bal.v)});return n}
+function acctNames(){const s=new Set(Object.keys(S.accts||{}));S.txns.forEach(t=>{if(t.from)return;if(t.acct)s.add(t.acct);if(t.to)s.add(t.to)});return [...s].sort((a,b)=>a.localeCompare(b))}
+const acctOf=n=>(S.accts||{})[n]||{};
+const acctKind=n=>acctOf(n).kind||guessKind(n,acctOf(n).bal);
+function acctMove(t,n){if(t.from)return 0;const a=fullAmt(t);if(t.to===n&&t.acct!==n)return a;if(t.acct!==n)return 0;return dirOf(t)==='in'?a:-a}
+/* Balance at the end of a day (today by default). null when no balance has been set yet */
+function acctBal(n,upto){const A=acctOf(n);if(A.bal==null||!A.at)return null;upto=upto||iso(new Date());let v=+A.bal,k=0;
+  const ts=+A.ts||0;for(const t of S.txns){if((t.date>A.at||t.date===A.at&&ts&&+t.ts>ts)&&t.date<=upto){const m=acctMove(t,n);if(m){v+=m;k++}}}return {v:Math.round(v*100)/100,n:k,at:A.at,src:A.src}}
+function acctLast(n){let d='';for(const t of S.txns)if(!t.from&&(t.acct===n||t.to===n)&&t.date>d)d=t.date;return d}
+let ASHOW=false;
+function balCard(){
+  if(BOARD)return '';const names=acctNames();if(!names.length)return '';
+  const vis=names.filter(n=>!acctOf(n).hide),hid=names.length-vis.length,list=ASHOW?names:vis,today=iso(new Date());
+  const rows=list.map(n=>{const k=acctKind(n),K=AKIND[k]||AKIND.bank,b=acctBal(n),last=acctLast(n),debt=isDebt(k);
+    const age=b?Math.round((Date.parse(today)-Date.parse(b.at))/864e5):0,stale=b&&age>30&&(!last||last<=b.at);
+    const sub=!b?'No balance yet. Tap to add it':b.at===today&&!b.n?'Updated today':(b.src==='bank'?'From your statement on ':'Set on ')+dLabel(b.at)+(b.n?', plus '+b.n+' since':'')+(stale?'. Import a new statement to refresh':'');
+    const amt=!b?`<span class="pill warn">Add</span>`:debt?`<span class="amt ${b.v<0?'neg':''}">${money(Math.abs(b.v),2)}</span><div class="subtle" style="font-size:11.5px;text-align:right">${b.v<0?'owing':'in credit'}</div>`:`<span class="amt ${b.v<0?'neg':''}">${money(b.v,2)}</span>`;
+    return `<div class="lrow clk${acctOf(n).hide?' ahid':''}" data-act="acctEdit" data-n="${esc(n)}">${catChip({i:K[1],c:K[2]},32)}<div class="grow"><div class="nm" style="font-size:13.5px">${esc(n)}</div><div class="sb">${esc(K[0])} · ${esc(sub)}</div></div><div>${amt}</div></div>`}).join('');
+  const set=vis.map(n=>[n,acctBal(n)]).filter(x=>x[1]),tot=set.reduce((a,x)=>a+x[1].v,0),hasDebt=set.some(x=>isDebt(acctKind(x[0]))),owe=set.filter(x=>x[1].v<0).reduce((a,x)=>a-x[1].v,0);
+  const head=set.length?`<div class="acctot"><div><div class="sb">${hasDebt||owe?'Net position':'Total across accounts'}${set.length<vis.length?', '+set.length+' of '+vis.length+' accounts':''}</div><div class="num ${tot<0?'neg':''}" style="font-size:24px">${money(tot,2)}</div></div>${owe?`<div style="text-align:right"><div class="sb">Owing</div><div class="amt neg" style="font-size:15px">${money(owe,2)}</div></div>`:''}</div>`:'<p class="muted" style="font-size:13px;margin:-4px 0 8px">Add a balance to each account to see what you have across all of them. Importing a statement with a balance column fills it in for you.</p>';
+  return `<div class="card acard"><div class="ch"><h3>Accounts</h3><button class="lnk" data-act="acctEdit" data-n="">${ic('plus',14,2)}Add account</button></div>${head}${rows}${hid?`<button class="lnk" style="margin-top:10px;font-size:12.5px" data-act="acctShow">${ASHOW?'Hide hidden accounts':'Show '+hid+' hidden account'+(hid>1?'s':'')}</button>`:''}</div>`;
+}
+let AE=null;
+function acctEdit(n){
+  const isNew=!n,A=acctOf(n),k=isNew?'bank':acctKind(n),b=isNew?null:acctBal(n),today=iso(new Date()),used=!isNew&&S.txns.some(t=>!t.from&&(t.acct===n||t.to===n));
+  const pre=b?String(Math.abs(b.v).toFixed(2)):'';AE={n:n||'',pre,preD:today,k};
+  $('#authBox').innerHTML=`<div class="mh"><h2>${isNew?'Add an account':esc(n)}</h2><button class="del" style="opacity:1" data-act="authClose" aria-label="Close">${ic('x',16)}</button></div>
+  <form id="acctForm" style="display:flex;flex-direction:column;gap:12px">
+    <label class="field">Name<input class="inp" id="aeName" maxlength="40" value="${esc(n||'')}" placeholder="Everyday, Joint, Visa" required></label>
+    <label class="field">Type<select class="inp" id="aeKind">${Object.entries(AKIND).map(([v,K])=>`<option value="${v}" ${v===k?'selected':''}>${K[0]}</option>`).join('')}</select></label>
+    <div class="row2"><label class="field"><span id="aeBalLab">${isDebt(k)?'Amount owing':'Balance'}</span><input class="inp" id="aeBal" type="number" step="0.01" inputmode="decimal" value="${pre}" placeholder="0.00"></label>
+    <label class="field">As at<input class="inp" id="aeAt" type="date" value="${today}" max="${today}"></label></div>
+    <div class="muted" id="aeHint" style="font-size:12.5px">${b?(b.src==='bank'?'Last set from your '+dLabel(b.at)+' statement':'Last set by you on '+dLabel(b.at))+(b.n?'. '+b.n+' transaction'+(b.n>1?'s':'')+' since then are included.':'.'):'Check your banking app and enter what it shows. Transactions after that date move it up and down on their own.'}</div>
+    ${isNew?'':`<label style="display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer"><input type="checkbox" id="aeHide" ${A.hide?'checked':''} style="accent-color:var(--accent);width:16px;height:16px">Hide from the dashboard</label>`}
+    <div class="autherr" id="aeErr"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" type="submit">${ic('check',16,2)}${isNew?'Add account':'Save'}</button>${!isNew&&!used?'<button class="btn sec" type="button" data-act="acctDel">Remove</button>':''}</div>
+    ${used?'<p class="subtle" style="font-size:12px">Renaming moves its transactions, goal links and share rules across too.</p>':''}
+  </form>`;
+  $('#authModal').classList.add('open');setTimeout(()=>$(isNew?'#aeName':'#aeBal').focus(),50);
+}
+/* Rename everywhere the name is used */
+function renameAcct(o,n){if(!o||o===n)return;
+  S.txns.forEach(t=>{if(t.acct===o)t.acct=n;if(t.to===o)t.to=n});(S.recurring||[]).forEach(r=>{if(r.acct===o)r.acct=n;if(r.to===o)r.to=n});
+  if(S.accts[o]){S.accts[n]=S.accts[o];delete S.accts[o]}
+  const st=S.settings;['acctBank','jointAccts'].forEach(k=>{if(st[k]&&o in st[k]){st[k][n]=st[k][o];delete st[k][o]}});
+  if(st.acctMap)for(const k in st.acctMap)if(st.acctMap[k]===o)st.acctMap[k]=n;
+  (st.shareRules||[]).forEach(r=>{if(r.f==='acct'&&r.v===o)r.v=n});
+  S.goals.forEach(g=>{if(g.link&&g.link.acct===o)g.link.acct=n});
+  if(st.lastAcct===o)st.lastAcct=n;
+}
+function acctSave(){
+  const name=$('#aeName').value.trim().replace(/\s+/g,' '),kind=$('#aeKind').value,raw=$('#aeBal').value.trim(),at=$('#aeAt').value||iso(new Date()),err=$('#aeErr');
+  if(!name){err.textContent='Give the account a name';return}
+  if(name!==AE.n&&acctNames().some(x=>x.toLowerCase()===name.toLowerCase()&&x!==AE.n)){err.textContent='You already have an account called '+name;return}
+  if(raw&&isNaN(parseFloat(raw))){err.textContent='Enter the balance as a number';return}
+  if(AE.n)renameAcct(AE.n,name);
+  const A=S.accts[name]=S.accts[name]||{};A.kind=kind;
+  if(raw!==AE.pre||at!==AE.preD&&raw){if(raw){let v=Math.round(parseFloat(raw)*100)/100;if(isDebt(kind))v=-Math.abs(v);A.bal=v;A.at=at;A.src='me';A.ts=Date.now()}else{delete A.bal;delete A.at;delete A.src;delete A.ts}}
+  else if(raw&&kind!==AE.k&&isDebt(kind)&&A.bal!=null&&AE.pre){const b=acctBal(name);if(b&&isDebt(kind)&&b.v>0){A.bal=-Math.abs(b.v);A.at=iso(new Date());A.src='me';A.ts=Date.now()}}
+  const h=$('#aeHide');if(h&&h.checked)A.hide=1;else delete A.hide;
+  $('#authModal').classList.remove('open');const b=acctBal(name);
+  toast(AE.n?'Account saved':'Account added',b?name+' · '+money(Math.abs(b.v),2)+(isDebt(kind)&&b.v<0?' owing':''):name,'good');AE=null;commit();
+}
+
 /* Goals linked to transfers: a goal follows a savings account, or transfers whose description matches. Totals update on their own */
 let LINKED=new Map();
 function linkHit(L,t,since){
   if(!L||t.goal||t.from||(since&&t.date<since))return 0;
-  if(L.acct){if(t.acct!==L.acct)return 0;return dirOf(t)==='in'?1:-1}
+  if(L.acct){if(t.to===L.acct&&t.acct!==L.acct)return 1;if(t.acct!==L.acct)return 0;return t.to?-1:dirOf(t)==='in'?1:-1}
   if(L.key&&(t.type==='transfer'||t.type==='expense'&&isSave(t.cat))&&matchKey(t.note,L.key))return dirOf(t)==='in'?-1:1;
   return 0;
 }
@@ -1917,7 +2006,7 @@ function syncGoalLinks(quiet){
 }
 const linkLabel=L=>L.acct?'your '+L.acct+' account':'transfers mentioning "'+L.key+'"';
 function linkOptions(){
-  const accts=[...new Set(S.txns.filter(t=>t.acct).map(t=>t.acct))].sort();
+  const accts=BOARD?[...new Set(S.txns.filter(t=>t.acct).map(t=>t.acct))].sort():acctNames();
   const keys={};S.txns.forEach(t=>{if(t.goal||t.from||!(t.type==='transfer'&&dirOf(t)==='out'||t.type==='expense'&&isSave(t.cat)))return;const k=suggestKey(t.note);if(!k||GENKEY.has(k))return;(keys[k]=keys[k]||{k,n:0,nm:'Transfers like "'+k.replace(/\b\w/g,c=>c.toUpperCase())+'"'}).n++});
   return {accts,keys:Object.values(keys).filter(x=>x.n>1).sort((a,b)=>b.n-a.n).slice(0,6)};
 }
@@ -2121,7 +2210,7 @@ function csvLayout(rows){
     const L={hi,di:pick([/^date$/,/^transaction date$/,/^(posted|effective|value|processed) date$/,/^time$/,/date/]),
       desc:pick([/^description$/,/^narrative$/,/^transaction details$/,/^details$/,/^payee$/,/^merchant name$/,/original description/,/desc/,/narrative|details|memo|payee|particulars|reference/]),
       ai:pick([/^amount$/,/^total \(aud\)$/,/^amount \(aud\)$/,/^transaction amount$/,h=>/amount|total/.test(h)&&!/debit|credit|balance|withdraw|deposit|sub|round/.test(h)]),
-      dr:pick([/debit|withdraw|money out|paid out/]),cr:pick([h=>/credit|deposit|money in|paid in/.test(h)&&!/card/.test(h)])};
+      dr:pick([/debit|withdraw|money out|paid out/]),cr:pick([h=>/credit|deposit|money in|paid in/.test(h)&&!/card/.test(h)]),bi:pick([/^balance$/,/^running balance$/,h=>/balance/.test(h)&&!/available|opening|closing/.test(h)])};
     L.bank=/narrative/.test(j)&&/debit amount/.test(j)?'Westpac':/transaction details/.test(j)&&/merchant name|transaction type/.test(j)?'NAB':/original description/.test(j)||(/details/.test(j)&&/subcategory/.test(j))?'Macquarie':/payee/.test(j)&&/total \(aud\)/.test(j)?'Up':/^date,description,credit,debit,balance/.test(j)?'ING':/^date,description,debit,credit,balance/.test(j)?'Suncorp':'';
     return L}
   const sample=rows.find(r=>r.some(c=>parseDate(c)));if(!sample)return null;
@@ -2129,7 +2218,7 @@ function csvLayout(rows){
   const ai=nums.length?nums[0]:-1;let desc=-1,best=0;sample.forEach((c,i)=>{const n=(c.match(/[a-z]/gi)||[]).length;if(i!==di&&i!==ai&&n>best){best=n;desc=i}});
   const signed=c=>/^[+-]/.test(String(c||'').trim());
   const bank=sample.length===4&&ai===1&&desc===2&&signed(sample[1])&&signed(sample[3])?'CommBank':sample.length===3&&ai===1&&desc===2?'ANZ':'';
-  return {hi:-1,di,desc,ai,dr:-1,cr:-1,bank}}
+  return {hi:-1,di,desc,ai,dr:-1,cr:-1,bank,bi:bank==='CommBank'?3:-1}}
 /* Is this money moving between your own accounts? Uses what the bank says ("Own account:"), card payments,
    and the account numbers and names learned from earlier "Own account" lines */
 function ownTransfer(note,own){
@@ -2151,12 +2240,13 @@ function stageBankCSV(text,staged,file,ctx){
   const body=rows.slice(L.hi+1),notes=body.map(r=>L.desc>=0?String(r[L.desc]||''):'').join(' ').toLowerCase();
   const byText=/commbank|netbank/.test(notes)?'CommBank':/westpac/.test(notes)&&!/westpac cards/.test(notes)?'Westpac':'';
   const fi=ctx.files.length,F={fi,file,bank:byText||L.bank||'',matched:[],same:{},rows:0,maybe:0,added:0,dup:0,bad:0};ctx.files.push(F);
-  const inFile=new Map(),earlier=staged.slice();
+  const inFile=new Map(),earlier=staged.slice(),BR=[];
   for(const r of body){
     const date=parseDate(r[L.di]);if(!date){F.bad++;continue}
     let amt=L.ai>=0?csvAmt(r[L.ai]):(Math.abs(csvAmt(r[L.cr]))||0)-(Math.abs(csvAmt(r[L.dr]))||0);
     if(!amt||isNaN(amt)){F.bad++;continue}
     F.rows++;
+    if(L.bi>=0){const b=csvAmt(r[L.bi]);if(!isNaN(b))BR.push([date,amt,b])}
     const note=(L.desc>=0?String(r[L.desc]||''):'').trim().replace(/\s+/g,' ').slice(0,60);
     const t={id:uid(),date,type:amt<0?'expense':'income',amount:Math.abs(Math.round(amt*100)/100),note,src:'bank',dir:amt<0?'out':'in',fi};
     t.bk=t.date+'|'+t.amount.toFixed(2)+'|'+note.toLowerCase();
@@ -2180,6 +2270,7 @@ function stageBankCSV(text,staged,file,ctx){
     const rl=findRule(note);if(rl&&(rl.type==='transfer'||rl.type===t.type)){t.type=rl.type;t.cat=rl.cat;t.ruled=1;t.sure=1}
     staged.push(t);if(!t.dupOf)F.added++;
   }
+  F.bal=pickBal(BR);
   return F;
 }
 /* Pay that lands regularly from the same payer is salary, even when the bank does not call it that */
@@ -2258,8 +2349,9 @@ async function importBankFiles(files){
   spotSalary(staged);nameFiles(ctx,staged);RV0={own:ctx.own};
   const list=a=>a.length<3?a.join(' and '):a.slice(0,-1).join(', ')+' and '+a[a.length-1];
   if(!staged.length&&!dup){toast(files.length===1?'Could not read that file':'Could not read those files','Export a CSV statement from your bank and try again','bad');return}
-  if(staged.length&&staged.every(t=>t.dupOf)){toast('Nothing new to import',staged.length+' look like transactions you already have, with a slightly different date or description. '+dup+' were exact matches.','info');return}
-  if(!staged.length){toast('Nothing new to import','All '+dup+' transaction'+(dup===1?' was':'s were')+' already in Moneyboard.'+(failed.length?' Could not read '+list(failed)+'.':''),failed.length?'bad':'info');return}
+  const nb=()=>{const n=applyBals(ctx.files.filter(F=>F.rows>0&&F.sure));if(n)commit();return n?' '+n+' account balance'+(n>1?'s':'')+' updated.':''};
+  if(staged.length&&staged.every(t=>t.dupOf)){const b=nb();toast('Nothing new to import',staged.length+' look like transactions you already have, with a slightly different date or description. '+dup+' were exact matches.'+b,'info');return}
+  if(!staged.length){const b=nb();toast('Nothing new to import','All '+dup+' transaction'+(dup===1?' was':'s were')+' already in Moneyboard.'+(failed.length?' Could not read '+list(failed)+'.':'')+b,failed.length?'bad':'info');return}
   const pairs=findPairs(staged.filter(t=>!t.dupOf));
   RV={staged,pairs,dup,banks,failed,list,pairIds:new Set(),files:ctx.files.filter(F=>F.rows>0),acctOpen:{},showPairs:false,showSorted:false};
   pairs.forEach(p=>p.sure=p.on);
@@ -2274,7 +2366,7 @@ function rvAcctBlock(){
   return `<div class="rvs"><h3>Accounts <span class="s">${open?R.files.length-open+' of '+R.files.length+' matched':'All matched'}</span></h3>${open?'<p class="subtle">Give each account its own name so your joint and personal accounts stay apart.</p>':''}
     <datalist id="rvAccts">${known.map(a=>`<option value="${esc(a)}">`).join('')}</datalist>
     ${R.files.map((F,i)=>{const n=R.staged.filter(t=>t.fi===F.fi&&(!t.dupOf||t.keep)).length,full=!F.sure||R.acctOpen[i];
-      const head=`<div class="rvah">${catChip({i:'bank',c:F.dest?'#0e7a5c':'#3f63a8'},32)}<div class="grow"><div class="nm">${esc(full?F.file:F.name)}</div><div class="sb">${full?'':esc(F.file)+' · '}${n} new${F.dup?', '+F.dup+' already in':''}${F.bank?' · '+esc(F.bank):''}</div></div>${full?'':`<button class="btn sec sm" data-rv="acct" data-i="${i}">Change</button>`}</div>`;
+      const head=`<div class="rvah">${catChip({i:'bank',c:F.dest?'#0e7a5c':'#3f63a8'},32)}<div class="grow"><div class="nm">${esc(full?F.file:F.name)}</div><div class="sb">${full?'':esc(F.file)+' · '}${n} new${F.dup?', '+F.dup+' already in':''}${F.bank?' · '+esc(F.bank):''}${F.bal?' · balance '+money(F.bal.v,2)+' on '+dLabel(F.bal.d):''}</div></div>${full?'':`<button class="btn sec sm" data-rv="acct" data-i="${i}">Change</button>`}</div>`;
       if(!full)return `<div class="rva rvlite">${head}</div>`;
       return `<div class="rva">${head}
       <div class="rvaf"><label class="field">Account name<input class="inp" list="rvAccts" data-rvacct="${i}" value="${esc(F.name)}" maxlength="40"></label>
@@ -2323,11 +2415,13 @@ function rvCommit(){
       S.txns.forEach(x=>{if(x.src==='bank'&&!x.goal&&!x.pair&&!x.from&&matchKey(x.note,key)&&x.type===g.type&&x.cat!==g.cat){x.cat=g.cat;touched++}});
     }});
   // Accounts: remember the name for this file, rename older lumped imports, set where the account goes
-  const map=S.settings.acctMap=S.settings.acctMap||{};let renamed=0;
+  const map=S.settings.acctMap=S.settings.acctMap||{};let renamed=0,bals=0;S.accts=S.accts||{};
   const keyCount={};R.files.forEach(F=>{const k=fileKey(F);keyCount[k]=(keyCount[k]||0)+1});
   R.files.forEach(F=>{const nm=(F.name||'').trim()||F.bank||'Bank account',k=fileKey(F);
     // Banks like CommBank name every export the same, so only remember a file name that points to one account
     if(keyCount[k]===1&&map[k]!=='?')map[k]=map[k]&&map[k]!==nm?'?':nm;else map[k]='?';
+    if(F.orig&&F.orig!==nm&&S.accts[F.orig]&&!S.accts[nm]){S.accts[nm]=S.accts[F.orig];delete S.accts[F.orig]}
+    F.name=nm;bals+=applyBals([F]);
     if(F.orig&&F.orig!==nm){const ids=new Set(F.matched.map(x=>x.id));R.staged.forEach(t=>{if(t.fi===F.fi&&t.dupOf&&!t.keep)ids.add(t.dupOf)});S.txns.forEach(x=>{if(ids.has(x.id)&&x.acct===F.orig){x.acct=nm;renamed++}})}
     if(F.bank){const ab=S.settings.acctBank=S.settings.acctBank||{};ab[nm]=F.bank}
     if(SB.user&&BD.list.length){const ja=S.settings.jointAccts=S.settings.jointAccts||{};if(F.dest)ja[nm]=F.dest;else delete ja[nm]}
@@ -2339,7 +2433,7 @@ function rvCommit(){
   syncWatch();markActive();const spot=spotBills().length;
   const n=take.length;
   completeMission('import');
-  toast(n+' transaction'+(n>1?'s':'')+' imported',[xf?xf+' transfer'+(xf>1?'s':'')+' matched':'',rules?rules+' rule'+(rules>1?'s':'')+' saved':'',touched?touched+' older transaction'+(touched>1?'s':'')+' updated':'',renamed?renamed+' older transaction'+(renamed>1?'s':'')+' moved to the right account':'',spot?spot+' repeating bill'+(spot>1?'s':'')+' spotted, see Transactions':''].filter(Boolean).join(', ')||'Categories are set, tweak any of them in Transactions','good');
+  toast(n+' transaction'+(n>1?'s':'')+' imported',[xf?xf+' transfer'+(xf>1?'s':'')+' matched':'',rules?rules+' rule'+(rules>1?'s':'')+' saved':'',touched?touched+' older transaction'+(touched>1?'s':'')+' updated':'',renamed?renamed+' older transaction'+(renamed>1?'s':'')+' moved to the right account':'',bals?bals+' account balance'+(bals>1?'s':'')+' updated':'',spot?spot+' repeating bill'+(spot>1?'s':'')+' spotted, see Transactions':''].filter(Boolean).join(', ')||'Categories are set, tweak any of them in Transactions','good');
   commit();
   if(unknownList().length)setTimeout(()=>sorterOpen(),600);
 }
@@ -3016,6 +3110,9 @@ document.addEventListener('click',e=>{
   else if(a==='gOpen'){GOPEN=el.dataset.id;render(true);setTimeout(()=>{const i=$('#c_'+GOPEN);if(i&&matchMedia('(hover:hover)').matches)i.focus()},30)}
   else if(a==='wkSeen'){const good=el.classList.contains('pri');S.flags.wkSeen=el.dataset.a;if(good){const [x,y]=centerOf(el);confetti(x,y,{n:60,power:.8})}save();render(true)}
   else if(a==='glOpen'){glOpen(el.dataset.id)}
+  else if(a==='acctEdit'){acctEdit(el.dataset.n)}
+  else if(a==='acctShow'){ASHOW=!ASHOW;render(true)}
+  else if(a==='acctDel'){const n=AE&&AE.n;if(n){delete S.accts[n];AE=null;$('#authModal').classList.remove('open');commit();toast(n+' removed','','info')}}
   else if(a==='glOff'){const g=GL&&S.goals.find(x=>x.id===GL.id);if(g){delete g.link;delete g.lsum;delete g.lcount}$('#authModal').classList.remove('open');save();render(true);if(g)toast(g.name+' unlinked','What it counted so far stays on the goal','info')}
   else if(a==='contrib'){const amt=el.dataset.amt?+el.dataset.amt:parseFloat(($('#c_'+el.dataset.id)||{}).value);contribute(el.dataset.id,amt,el)}
   else if(a==='delGoal'){if(locked(S.goals,el.dataset.id))return;if(el.dataset.armed){S.goals=S.goals.filter(g=>g.id!==el.dataset.id);save();render()}else{el.dataset.armed=1;el.style.width='auto';el.style.padding='0 8px';el.style.color='var(--neg)';el.textContent='Delete?';setTimeout(()=>{if(el.isConnected){delete el.dataset.armed;el.removeAttribute('style');el.innerHTML=ic('x',14)}},3000)}}
@@ -3056,6 +3153,7 @@ document.addEventListener('change',e=>{const t=e.target;
   else if(t.name==='glk'||t.id==='glSince'){glPreview()}
   else if(t.id==='sNotif'){S.settings.notifLevel=t.value;if(t.value!=='all'){S.notifs=S.notifs.filter(n=>!NOTIF_EXTRA[n.cat])}save();$('#remindCard').innerHTML=remindCard();renderTop()}
   else if(t.id==='sRemind'){S.settings.remind=+t.value;checkBills(true);save();toast(+t.value?'Bill reminders on':'Bill reminders off',+t.value?'You will be reminded '+t.selectedOptions[0].text.toLowerCase():'Turn them back on any time here','info')}
+  else if(t.id==='aeKind'){$('#aeBalLab').textContent=isDebt(t.value)?'Amount owing':'Balance'}
   else if(t.id==='bankFile'&&t.files.length){const fs=[...t.files];t.value='';importBankFiles(fs)}
   else if(t.id==='importFile'&&t.files[0]){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.txns))throw 0;S=Object.assign(fresh(),d,{syncUid:S.syncUid,syncAt:S.syncAt,view:S.view});S.flags.welcomed=true;S.flags.sample=false;save();render();toast('Backup restored',S.txns.length+' transactions loaded','good')}catch(err){toast('Import failed','Choose a Moneyboard backup file (.json)','bad')}};r.readAsText(t.files[0])}
 });
@@ -3069,6 +3167,7 @@ document.addEventListener('submit',e=>{
   if(e.target.id==='itemForm'){e.preventDefault();const name=$('#iName').value.trim(),cat=$('#iCat').value,amt=parseAmt($('#iAmt').value);if(!name||!(amt>0)){$('#iAmt').focus();return}
     const ex=IM.id&&S.items.find(x=>x.id===IM.id),shE=$('#iShare');let tgt=ex;if(ex){if(ex.name!==name||ex.cat!==cat)ex.key=null;Object.assign(ex,{name,cat,amt,freq:IM.f});delete ex.full}else{tgt={id:uid(),key:null,cat,name,amt,freq:IM.f};S.items.push(tgt)}if(shE)readShare('iShare','items',tgt);
     $('#itemModal').classList.remove('open');if(cat!=='Income')OPEN.add(cat);commit();toast('Budget item saved',name+': '+money(amt*FREQ[IM.f][1],2)+' a week','good');return}
+  if(e.target.id==='acctForm'){e.preventDefault();acctSave();return}
   if(e.target.id==='glForm'){e.preventDefault();const g=GL&&S.goals.find(x=>x.id===GL.id),L=glPick();if(!g)return;if(!L){$('#glErr').textContent='Pick an account or a transfer, or type what the transfers mention';return}
     const before=g.saved;const sv=$('#glSince').value;g.link=Object.assign(L,sv==='all'?{}:{since:sv==='keep'&&g.link&&g.link.since?g.link.since:iso(new Date())});$('#authModal').classList.remove('open');syncGoalLinks();const d=Math.round((g.saved-before)*100)/100;
     toast(g.name+' linked','Follows '+linkLabel(g.link)+(d?'. '+(d>0?'+':'-')+money(Math.abs(d))+' counted':''),'good');save();render(true);return}
