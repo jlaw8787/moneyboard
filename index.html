@@ -973,7 +973,7 @@ function runRecurring(){
   (S.recurring||[]).forEach(r=>{if(r.watch){const late=addDays(today,-5);let g=0;while(r.next<late&&g<500){r.next=nextDate(r.next,r.freq,r.day);g++}return}let g=0;while(r.next<=today&&g<500){const rid='r-'+r.id+'-'+r.next;if(!S.txns.some(x=>x.id===rid))S.txns.push(Object.assign({id:rid,date:r.next,type:r.type,amount:r.amount,cat:r.cat,note:r.note,rec:r.id,auto:true},r.full!=null?{full:r.full,sp:'auto'}:{}));r.next=nextDate(r.next,r.freq,r.day);n++;g++}});
   return n;
 }
-function recurringNotice(n,quiet){if(!n)return;const b='Repeating items were added on their due dates';notify(n+' repeating transaction'+(n>1?'s':'')+' logged',b,'info');if(!quiet)toast(n+' repeating transaction'+(n>1?'s':'')+' logged',b,'info')}
+function recurringNotice(n,quiet){if(!n)return;const b='Repeating items were added on their due dates';notify(n+' repeating transaction'+(n>1?'s':'')+' logged',b,'info','routine');if(!quiet)toast(n+' repeating transaction'+(n>1?'s':'')+' logged',b,'info')}
 function delTx(id){
   const t=S.txns.find(x=>x.id===id);if(!t)return null;
   if(t.goal){const g=S.goals.find(x=>x.id===t.goal);if(g){g.saved=Math.max(0,Math.round((g.saved-t.amount)*100)/100);if(g.from)g.extra=Math.max(0,Math.round(((+g.extra||0)-t.amount)*100)/100)}}
@@ -1017,7 +1017,7 @@ function getDaily(){const d=iso(new Date());if(!S.daily||S.daily.date!==d)S.dail
 function completeMission(id,el){
   const D=getDaily();if(D.done[id])return;D.done[id]=1;const m=MISSIONS.find(x=>x.id===id);
   const before=level();S.xp+=m.xp;if(el&&el.offsetParent)floatAt(el,'+'+m.xp+' XP');
-  if(MISSIONS.every(x=>D.done[x.id])){S.xp+=25;notify('Perfect day','All three daily missions done. +25 bonus XP','win');setTimeout(()=>showAch({kind:'day',title:'Perfect day',sub:'You completed every daily mission. Come back tomorrow for more.',xp:25+m.xp}),400)}
+  if(MISSIONS.every(x=>D.done[x.id])){S.xp+=25;notify('Perfect day','All three daily missions done. +25 bonus XP','win','xp');setTimeout(()=>showAch({kind:'day',title:'Perfect day',sub:'You completed every daily mission. Come back tomorrow for more.',xp:25+m.xp}),400)}
   else toast('Mission complete: '+m.t,'+'+m.xp+' XP','win');
   checkLevel(before);save();
 }
@@ -1035,24 +1035,40 @@ function evalChallenges(silent){
   for(const c of CHALLENGES){
     if(S.unlocked[c.id]||clamp(c.prog())<1)continue;
     const before=level();S.unlocked[c.id]=iso(new Date());S.xp+=c.xp;
-    notify('Badge earned: '+c.name,'+'+c.xp+' XP','win');
+    notify('Badge earned: '+c.name,'+'+c.xp+' XP','win','xp');
     if(!silent)showAch({kind:'badge',title:c.name,sub:c.desc,xp:c.xp,icon:c.icon,tier:tierOf(c.xp)});
     checkLevel(before,silent);
   }
 }
 function gainXP(n,el){const before=level();S.xp+=n;if(el)floatAt(el,'+'+n+' XP');checkLevel(before)}
-function checkLevel(before,silent){const l=level();if(l>before){notify('Level '+l+' reached','New title: '+levelTitle(l),'win');if(!silent)showAch({kind:'level',level:l,title:levelTitle(l),sub:'You reached level '+l+'. New title unlocked.'})}}
+function checkLevel(before,silent){const l=level();if(l>before){notify('Level '+l+' reached','New title: '+levelTitle(l),'win','xp');if(!silent)showAch({kind:'level',level:l,title:levelTitle(l),sub:'You reached level '+l+'. New title unlocked.'})}}
 
 /* ============ Alerts and notifications ============ */
 const KIND={win:['trophy','#c08a1f','#fcf5e6'],bad:['alert','#c4463d','#fbeceb'],warn:['alert','#b5761a','#fbf2e2'],good:['check','#0e7a5c','#e7f3ee'],info:['info','#3f63a8','#ebf0f8']};
-function notify(title,body,kind){S.notifs.unshift({id:uid(),title,body,kind:kind||'info',t:Date.now(),read:false});S.notifs=S.notifs.slice(0,60)}
+/* Bell levels: important (default) keeps over budget, bills, invites, reports and goals reached. Everything also keeps the extras below */
+const NOTIF_EXTRA={near:1,routine:1,xp:1,goalstep:1};
+const notifAll = () => S.settings.notifLevel==='all';
+function notify(title,body,kind,cat){
+  if(cat&&NOTIF_EXTRA[cat]&&!notifAll())return;
+  S.notifs.unshift({id:uid(),title,body,kind:kind||'info',cat:cat||'',t:Date.now(),read:false});pruneNotifs();
+}
+function pruneNotifs(){const old=Date.now()-14*864e5;S.notifs=S.notifs.filter(n=>!n.read||n.t>old).slice(0,30)}
+function cleanNotifs(){
+  if(!S.flags.nq){S.flags.nq=1;const noise=/repeating transaction|% of budget|% funded|^Badge earned|^Level \d+ reached|^Perfect day/;S.notifs=(S.notifs||[]).filter(n=>!noise.test(n.title))}
+  pruneNotifs();
+}
+const listNames = a => a.length<=3?a.join(', '):a.slice(0,3).join(', ')+' and '+(a.length-3)+' more';
 function checkAlerts(silent){
-  const ym=curYM(),t=totals(ym);
+  const ym=curYM(),t=totals(ym),over=[],near=[];
   for(const c of spendCats()){
     const sp=t.byCat[c]||0,cb=catBud(c,daysIn(ym)/7,sp),b=cb.b;if(!b)continue;const p=sp/b,k=ym+'|'+c;
-    if(sp>b+.5&&!S.alerted[k+'|100']){S.alerted[k+'|100']=S.alerted[k+'|80']=1;notify(c+' is over budget',money(sp)+' spent of '+money(b),'bad');if(!silent)toast(c+' is over budget',money(sp)+' spent of '+money(b),'bad')}
-    else if(!cb.bill&&!isBill(c)&&p>=.8&&sp<=b+.5&&!S.alerted[k+'|80']){S.alerted[k+'|80']=1;notify(c+' at '+Math.round(p*100)+'% of budget',money(b-sp)+' left this month','warn');if(!silent)toast(c+' at '+Math.round(p*100)+'% of budget',money(b-sp)+' left this month','warn')}
+    if(sp>b+.5&&!S.alerted[k+'|100']){S.alerted[k+'|100']=S.alerted[k+'|80']=1;over.push({c,sp,b})}
+    else if(!cb.bill&&!isBill(c)&&p>=.8&&sp<=b+.5&&!S.alerted[k+'|80']){S.alerted[k+'|80']=1;near.push({c,sp,b,p})}
   }
+  if(over.length){const o=over[0],ti=over.length===1?catName(o.c)+' is over budget':over.length+' budgets are over',bo=over.length===1?money(o.sp)+' spent of '+money(o.b):listNames(over.map(x=>catName(x.c)))+', '+money(over.reduce((a,x)=>a+x.sp-x.b,0))+' over in total';
+    notify(ti,bo,'bad');if(!silent)toast(ti,bo,'bad')}
+  if(near.length){const o=near[0],ti=near.length===1?catName(o.c)+' at '+Math.round(o.p*100)+'% of budget':near.length+' budgets are nearly used',bo=near.length===1?money(o.b-o.sp)+' left this month':listNames(near.map(x=>catName(x.c)))+' are past 80%';
+    notify(ti,bo,'warn','near');if(!silent&&notifAll())toast(ti,bo,'warn')}
   checkBills(silent);checkReport();
 }
 /* ============ Bill reminders ============ */
@@ -1075,11 +1091,15 @@ function checkBills(silent){
   for(const k in S.alerted){if(k.startsWith('bill|')&&k.slice(-10)<today)delete S.alerted[k]}
   let sent={};try{sent=JSON.parse(localStorage.getItem('mb-billalerts')||'{}')}catch(e){}
   for(const k in sent)if(k.slice(-10)<today)delete sent[k];
-  if(days)upcomingBills(days).forEach(({r,date})=>{
-    const k='bill|'+r.id+'|'+date,nm=r.note||r.cat,n=daysUntil(date),title=nm+' due '+whenText(n),body=money(r.amount,2)+' on '+new Date(date+'T00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
-    if(!S.alerted[k]){S.alerted[k]=1;notify(title,body,'warn');if(!silent)toast(title,body,'warn')}
-    if(!sent[k]&&S.settings.phoneAlerts&&!pushOn()){sent[k]=1;sysNotify(title,body,k)}
+  const bell=[],phone=[];
+  if(days)upcomingBills(days).forEach(x=>{const k='bill|'+x.r.id+'|'+x.date;
+    if(!S.alerted[k]){S.alerted[k]=1;bell.push(x)}
+    if(!sent[k]&&S.settings.phoneAlerts&&!pushOn()){sent[k]=1;phone.push(x)}
   });
+  const msg=L=>{const nm=x=>x.r.note||catName(x.r.cat);if(L.length===1){const x=L[0];return [nm(x)+' due '+whenText(daysUntil(x.date)),money(x.r.amount,2)+' on '+new Date(x.date+'T00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'})]}
+    return [L.length+' bills due soon, '+money(L.reduce((a,x)=>a+x.r.amount,0))+' total',L.slice(0,4).map(x=>nm(x)+' '+money(x.r.amount)+' '+whenText(daysUntil(x.date))).join(', ')+(L.length>4?', plus '+(L.length-4)+' more':'')]};
+  if(bell.length){const [ti,bo]=msg(bell);notify(ti,bo,'warn');if(!silent)toast(ti,bo,'warn')}
+  if(phone.length){const [ti,bo]=msg(phone);sysNotify(ti,bo,'bills|'+today)}
   try{localStorage.setItem('mb-billalerts',JSON.stringify(sent))}catch(e){}
 }
 function billsCard(){
@@ -1109,8 +1129,10 @@ async function pushUnsubscribe(){
 }
 function remindCard(){
   const has='Notification' in window,perm=has?Notification.permission:'denied',on=S.settings.phoneAlerts&&perm==='granted';
-  return `<div class="ch"><h3>Bill reminders</h3></div>
-    <label class="field" style="max-width:260px">Remind me<select class="inp" id="sRemind">${[[0,'Off'],[1,'1 day before'],[2,'2 days before'],[3,'3 days before'],[7,'A week before']].map(([v,l])=>`<option value="${v}" ${remindDays()===v?'selected':''}>${l}</option>`).join('')}</select></label>
+  return `<div class="ch"><h3>Notifications</h3></div>
+    <label class="field" style="max-width:260px">Bell shows<select class="inp" id="sNotif"><option value="important" ${notifAll()?'':'selected'}>Important only</option><option value="all" ${notifAll()?'selected':''}>Everything</option></select></label>
+    <p class="muted" style="font-size:13px;margin:10px 0 18px">${notifAll()?'Everything adds budgets past 80%, repeating items logged, badges, levels and goal progress.':'Over budget, bills due, joint board invites, monthly reports and goals reached. Alerts that land together are rolled into one.'}</p>
+    <label class="field" style="max-width:260px">Bill reminders<select class="inp" id="sRemind">${[[0,'Off'],[1,'1 day before'],[2,'2 days before'],[3,'3 days before'],[7,'A week before']].map(([v,l])=>`<option value="${v}" ${remindDays()===v?'selected':''}>${l}</option>`).join('')}</select></label>
     <p class="muted" style="font-size:13px;margin:14px 0">Reminders come from your repeating expenses and show in the bell. Phone alerts pop up on this device too. ${SB.user?'Because you are signed in, they also come through at 7am each morning when the app is closed.':'Sign in and they will also come through at 7am each morning when the app is closed. Without signing in they only show while the app is open.'}</p>
     ${!has?'<div class="recnote">This browser does not support alerts. On an iPhone, add Moneyboard to your home screen first, then open it from there.</div>':perm==='denied'?'<div class="recnote">Alerts are blocked for this site. Turn them on in your browser or phone settings, then come back here.</div>':on?`${SB.user&&!pushOn()&&canPush()?'<div class="recnote" style="margin:0 0 12px">Alerts are on while the app is open. Tap Turn off, then turn them back on to get alerts while it is closed too.</div>':''}<div style="display:flex;gap:8px;flex-wrap:wrap"><span class="pill ok" style="height:30px;padding:0 12px">${ic('check',13,2.4)}&nbsp;${pushOn()?'Alerts on, even when closed':'Phone alerts on'}</span><button class="btn sec sm" data-act="alertsOff">Turn off</button><button class="btn sec sm" data-act="alertsTest">Send a test</button></div>`:`<button class="btn sec" data-act="alertsOn">${ic('bell',16)}Turn on phone alerts</button>`}`;
 }
@@ -1850,7 +1872,7 @@ function contribute(id,amt,el){
   const [x,y]=centerOf(el);let milestone=false;
   for(const m of [25,50,75,100]){if(after*100>=m&&!g.hit[m]){g.hit[m]=1;milestone=true;
     if(m===100){notify('Goal reached: '+g.name,money(g.target)+' fully funded','win');showAch({kind:'goal',title:g.name,sub:money(g.target)+' fully funded. Well done.',icon:g.icon,xp:0})}
-    else{notify(g.name+' is '+m+'% funded',money(g.saved)+' of '+money(g.target),'good');toast(g.name+' is '+m+'% funded',money(g.saved)+' of '+money(g.target),'good')}}}
+    else{notify(g.name+' is '+m+'% funded',money(g.saved)+' of '+money(g.target),'good','goalstep');toast(g.name+' is '+m+'% funded',money(g.saved)+' of '+money(g.target),'good')}}}
   confetti(x,y,{n:milestone?90:28,power:milestone?1:.6,colors:[g.color,'#d39a2c','#0d1117','#c9ced6']});
   if(!milestone)toast('Added to '+g.name,'+'+money(amt)+', now '+money(g.saved)+'. Logged under Savings','good');
   gainXP(3);completeMission('goal',el);commit();
@@ -2908,7 +2930,7 @@ document.addEventListener('click',e=>{
   else if(a==='rpPrint'){window.print()}
   else if(a==='rpCopy'){const tx=reportText(S.month),ok=()=>toast('Summary copied','Paste it into a message or email','good');if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(tx).then(ok).catch(()=>toast('Could not copy','Your browser blocked the clipboard','bad'));else toast('Could not copy','Your browser blocked the clipboard','bad')}
   else if(a==='month'){S.month=shiftYM(S.month,+el.dataset.n);save();render()}
-  else if(a==='bell'){const p=$('#npanel');p.classList.toggle('open');if(p.classList.contains('open'))renderNotifs()}
+  else if(a==='bell'){const p=$('#npanel');p.classList.toggle('open');if(p.classList.contains('open')){renderNotifs();if(S.notifs.some(n=>!n.read)){S.notifs.forEach(n=>n.read=true);save();$('#bellBtn').innerHTML=ic('bell',18)}}}
   else if(a==='readAll'){S.notifs.forEach(n=>n.read=true);save();renderTop()}
   else if(a==='delTx'){if(locked(S.txns,el.dataset.id))return;delTx(el.dataset.id);save();render(true);toast('Transaction deleted','','info')}
   else if(a==='contrib'){const amt=el.dataset.amt?+el.dataset.amt:parseFloat(($('#c_'+el.dataset.id)||{}).value);contribute(el.dataset.id,amt,el)}
@@ -2946,6 +2968,7 @@ document.addEventListener('change',e=>{const t=e.target;
   else if(t.dataset.shsel){const w=t.closest('.shfield'),b=w&&w.querySelector('.shsplit');if(b)b.hidden=!t.value}
   else if(t.dataset.shsplit){const w=t.closest('.shsplit'),b=w&&w.querySelector('.shpct');if(b)b.hidden=t.value!=='custom'}
   else if(t.id==='sMyName'){S.settings.myName=t.value.trim().slice(0,24);save();toast('Name saved','Shared entries show as from '+myName(),'good')}
+  else if(t.id==='sNotif'){S.settings.notifLevel=t.value;if(t.value!=='all'){S.notifs=S.notifs.filter(n=>!NOTIF_EXTRA[n.cat])}save();$('#remindCard').innerHTML=remindCard();renderTop()}
   else if(t.id==='sRemind'){S.settings.remind=+t.value;checkBills(true);save();toast(+t.value?'Bill reminders on':'Bill reminders off',+t.value?'You will be reminded '+t.selectedOptions[0].text.toLowerCase():'Turn them back on any time here','info')}
   else if(t.id==='bankFile'&&t.files.length){const fs=[...t.files];t.value='';importBankFiles(fs)}
   else if(t.id==='importFile'&&t.files[0]){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.txns))throw 0;S=Object.assign(fresh(),d,{syncUid:S.syncUid,syncAt:S.syncAt,view:S.view});S.flags.welcomed=true;S.flags.sample=false;save();render();toast('Backup restored',S.txns.length+' transactions loaded','good')}catch(err){toast('Import failed','Choose a Moneyboard backup file (.json)','bad')}};r.readAsText(t.files[0])}
@@ -2982,7 +3005,7 @@ document.addEventListener('keydown',e=>{
 });
 
 /* ============ Boot ============ */
-const bootRec=runRecurring();recurringNotice(bootRec,true);
+cleanNotifs();const bootRec=runRecurring();recurringNotice(bootRec,true);
 checkAlerts(true);evalChallenges(true);save(true);render();renderSync();sbLoad();
 document.addEventListener('visibilitychange',()=>{if(document.hidden){if(SB.user&&(S.savedAt||0)>(S.syncAt||0))pushNow();return}const bills=()=>{const c=Object.keys(S.alerted).length;checkBills();if(Object.keys(S.alerted).length!==c){save();render(true)}};if(SB.user){refreshBoards();pull().then(bills);return}const n=runRecurring();if(n){recurringNotice(n);commit()}else bills()});
 addEventListener('online',()=>{if(SB.user)pull()});
