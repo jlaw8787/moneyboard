@@ -314,8 +314,9 @@ button.shline{font-weight:500}
 .note{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:10px;font-size:13px}
 .note.ok{background:var(--accent-soft);color:var(--accent-2)}
 .note.warn{background:var(--warn-soft);color:#8a5a12}
+.dbctl #dbStrat button{flex:1;white-space:nowrap}.dbctl .field:first-child{min-width:310px}.chart .note svg{width:16px;height:16px;flex:none;margin-top:1px}.dbchart text{font-size:11px}
 .dbctl{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:20px}.dbctl .field{flex:none}.dbctl .field.grow{flex:1;min-width:180px}.dbctl #dbExtra{width:140px}
-@media (max-width:560px){.dbfigs{display:grid;grid-template-columns:1fr 1fr;gap:14px 12px}.dbfigs b{font-size:20px}.dbctl #dbExtra{width:120px}}
+@media (max-width:560px){.dbctl{display:grid;grid-template-columns:auto 1fr;gap:12px}.dbctl .field:first-child{grid-column:1/-1;min-width:0}.dbctl .field.grow{min-width:0}.chart.dbchart svg text{font-size:21px}.dbfigs{display:grid;grid-template-columns:auto auto;justify-content:start;gap:14px 28px}.dbfigs b{font-size:20px}.dbctl #dbExtra{width:120px}}
 .dbn{width:20px;height:20px;border-radius:50%;background:#f1f2f4;color:var(--muted);font-size:11px;font-weight:600;display:grid;place-items:center;flex:none}
 .tile{border:1px solid var(--line2);border-radius:12px;padding:16px;background:#fafbfc}
 .tile small{font-size:12.5px;color:var(--muted)}
@@ -1397,7 +1398,7 @@ V.dashboard=()=>{
   <div class="card quiet"><div style="display:flex;justify-content:center">${catChip({i:'trend',c:'#0e7a5c'},44)}</div><h3 style="margin-top:12px">Your charts start here</h3><p class="muted">Add or import a few transactions and this fills up with your week, your bills and your budgets.</p></div>`;
   return `${backupBanner()}${gsCard()}${P.player}${weekWrap()}${reportNudge()}
   <div class="grid c2 dgrid">${P.week}${P.bud}</div>
-  ${balCard()}
+  ${balCard()}${debtCard()}
   <div class="grid c2 dgrid">${billsCard()}${P.recent}</div>
   <button class="card morecard" data-act="nav" data-view="report">${catChip({i:'book',c:'#0e7a5c'},36)}<div class="grow"><div class="nm">Want the full picture?</div><div class="sb">Spending pace, insights, trends and your money health score are in Report</div></div>${ic('chevR',18)}</button>`;
 
@@ -1759,6 +1760,12 @@ function mSpan(m){const y=Math.floor(m/12),r=m%12;return [y?y+' year'+(y>1?'s':'
 const mDate=m=>ymLabel(shiftYM(curYM(),m));
 const mTick=m=>{const [y,mo]=shiftYM(curYM(),m).split('-').map(Number);return new Date(y,mo-1,1).toLocaleDateString('en-AU',{month:'short'})+" '"+String(y).slice(2)};
 function debtRows(){return (S.debts||[]).map(d=>Object.assign({},d,{owe:debtOwing(d)}))}
+function debtCard(){
+  const rows=debtRows().filter(d=>d.owe>.005);let nm,sb;
+  if(rows.length){const p=dPlan(),pl=debtSim(rows,p.extra,p.strat),owe=rows.reduce((a,d)=>a+d.owe,0);if(!pl.done){nm='Your debts are not going down';sb=money(owe)+' owing. Open your plan to see what it takes to clear it'}else{nm='Debt free by '+mDate(pl.m);sb=money(owe)+' owing, '+mSpan(pl.m).toLowerCase()+' to go at '+money(pl.budget)+' a month'}}
+  else{if((S.debts||[]).length)return '';const sg=debtSuggest().map(n=>acctBal(n)).filter(b=>b&&b.v<-.5);if(!sg.length)return '';nm='Plan your way out of debt';sb=money(sg.reduce((a,b)=>a-b.v,0))+' owing on your cards and loans. See how fast you could clear it'}
+  return `<button class="card morecard" data-act="nav" data-view="debts">${catChip({i:'trendDown',c:'#b4553a'},36)}<div class="grow"><div class="nm">${esc(nm)}</div><div class="sb">${esc(sb)}</div></div>${ic('chevR',18)}</button>`;
+}
 function debtSuggest(){if(BOARD)return [];const used=new Set((S.debts||[]).map(d=>d.acct).filter(Boolean));return acctNames().filter(n=>isDebt(acctKind(n))&&!used.has(n))}
 
 V.debts=()=>{
@@ -1768,11 +1775,12 @@ V.debts=()=>{
     <p class="muted" style="font-size:13.5px;margin-bottom:16px">Add your credit cards and loans with their interest rate and minimum repayment. You get a debt free date, what it will cost in interest, and how much sooner you get there by putting a bit extra on each month.</p>
     ${sug.length?`<div class="sb" style="margin-bottom:6px">From your accounts</div>${sugHtml}<div style="height:16px"></div>`:''}
     <button class="btn pri" data-act="debtNew" data-n="">${ic('plus',16,2)}Add a debt</button></div>`;
-  const owe=rows.reduce((a,d)=>a+(d.owe||0),0),start=rows.reduce((a,d)=>a+Math.max(+d.start||0,d.owe||0),0),gone=Math.max(0,start-owe);
+  const owe=rows.reduce((a,d)=>a+(d.owe||0),0),start=rows.reduce((a,d)=>a+(+d.start||0),0),gone=rows.reduce((a,d)=>a+(d.owe==null?0:Math.max(0,(+d.start||0)-d.owe)),0);
   return `<div class="grid w21">
-    <div class="card chart"><div class="ch"><h3>Your payoff plan</h3><span class="s">${p.strat==='snowball'?'Smallest balance first':'Highest interest first'}</span></div>
+    <div class="card chart dbchart"><div class="ch"><h3>Your payoff plan</h3><span class="s">${p.strat==='snowball'?'Quicker wins':'Saves the most interest'}</span></div>
+      <div id="dbFigs"></div>
       <div class="dbctl">
-        <div class="field">Strategy<div class="segc" id="dbStrat"><button data-dbs="avalanche" class="${p.strat==='avalanche'?'on':''}">Avalanche</button><button data-dbs="snowball" class="${p.strat==='snowball'?'on':''}">Snowball</button></div></div>
+        <div class="field">Pay off first<div class="segc" id="dbStrat"><button data-dbs="avalanche" class="${p.strat==='avalanche'?'on':''}">Highest interest</button><button data-dbs="snowball" class="${p.strat==='snowball'?'on':''}">Smallest balance</button></div></div>
         <label class="field">Extra each month<input class="inp" id="dbExtra" type="number" min="0" step="10" inputmode="decimal" value="${+p.extra||0}"></label>
         <label class="field grow"><span style="display:flex;justify-content:space-between">Slide to try it<b id="dbExLab" style="color:var(--ink);font-weight:600">${money(+p.extra||0)}</b></span><input class="range" type="range" id="dbRange" min="0" max="${Math.max(2000,Math.ceil((+p.extra||0)/500)*500)}" step="10" value="${+p.extra||0}" style="height:38px"></label>
       </div>
@@ -1785,15 +1793,15 @@ V.debts=()=>{
       ${sug.length?`<div class="sb" style="margin:16px 0 4px">Also in your accounts</div>${sugHtml}`:''}
     </div>
   </div>
-  <p class="subtle" style="font-size:12px;margin-top:-4px">Avalanche clears the highest interest rate first and costs the least. Snowball clears the smallest balance first for quicker wins. Either way, every minimum gets paid and a cleared debt's repayment rolls onto the next one. Figures are estimates that assume rates and repayments stay the same.</p>`;
+  <p class="subtle" style="font-size:12px;margin-top:-4px">Highest interest first (the avalanche method) costs the least. Smallest balance first (the snowball method) clears whole debts sooner, which helps you stay motivated. Either way, every minimum gets paid and a cleared debt's repayment rolls onto the next one. Figures are estimates that assume rates and repayments stay the same.</p>`;
 };
 function renderDebtOut(){
-  const box=$('#dbOut');if(!box)return;const p=dPlan(),rows=debtRows(),ok=rows.filter(d=>d.owe>.005),miss=rows.filter(d=>d.owe==null);
+  const box=$('#dbOut');if(!box)return;$('#dbFigs').innerHTML='';const p=dPlan(),rows=debtRows(),ok=rows.filter(d=>d.owe>.005),miss=rows.filter(d=>d.owe==null);
   const plan=debtSim(ok,p.extra,p.strat),base=debtSim(ok,0,p.strat,true),alt=debtSim(ok,p.extra,p.strat==='snowball'?'avalanche':'snowball');
   /* List, in payoff order */
   const pos=new Map(plan.ord.map((id,i)=>[id,i])),sorted=[...rows].sort((a,b)=>{const pa=plan.paid[a.id]||9999,pb=plan.paid[b.id]||9999;return (a.owe>.005?0:1)-(b.owe>.005?0:1)||pa-pb||(pos.get(a.id)??99)-(pos.get(b.id)??99)});
   let n=0;$('#dbList').innerHTML=sorted.map(d=>{const K=DKIND[d.kind]||DKIND.other,cleared=d.owe!=null&&d.owe<=.005,low=d.owe>.005&&debtMin(d)<=d.owe*(+d.rate||0)/1200+.005;
-    const pill=d.owe==null?'<span class="pill warn">Add balance</span>':cleared?'<span class="pill ok">Cleared</span>':plan.paid[d.id]?`<span class="pill nt">${esc(mTick(plan.paid[d.id]))}</span>`:'';
+    const pill=d.owe==null?(d.acct&&!BOARD?`<button class="pill warn" data-act="acctEdit" data-n="${esc(d.acct)}">Add balance</button>`:'<span class="pill warn">Add balance</span>'):cleared?'<span class="pill ok">Cleared</span>':plan.paid[d.id]?`<span class="pill nt">${esc(mTick(plan.paid[d.id]))}</span>`:'';
     const sub=[(+d.rate||0)+'%',d.min?money(+d.min)+' '+(DFREQ[d.freq]||DFREQ.month)[0]:'no minimum set',d.acct&&!BOARD?'follows '+d.acct:''].filter(Boolean).join(' · ');
     return `<div class="lrow clk" data-act="debtEdit" data-id="${d.id}">${d.owe>.005?`<span class="dbn">${++n}</span>`:''}${catChip({i:K[1],c:K[2]},32)}<div class="grow"><div class="nm" style="font-size:13.5px">${esc(d.name)}</div><div class="sb">${esc(sub)}</div>${low?'<div class="sb neg">Minimum does not cover the interest</div>':''}</div><div style="text-align:right"><div class="amt">${d.owe==null?'':money(d.owe,2)}</div>${pill}</div></div>`}).join('');
   if(!ok.length){box.innerHTML=`<div class="note ok" style="margin-top:4px">${ic('check',16,2)}<span>${miss.length?'Add a balance to each debt to see your plan.':'Nothing owing. Every debt you track is cleared.'}</span></div>`;return}
@@ -1805,12 +1813,12 @@ function renderDebtOut(){
   const gl=[0,.5,1].map(f=>{const v=mx/1.08*f;return `<line x1="${L}" x2="${W}" y1="${Y(v)}" y2="${Y(v)}" stroke="#eff1f4"/><text x="${L-8}" y="${Y(v)+4}" text-anchor="end">${short(v)}</text>`}).join('');
   const step=xMax<=12?3:xMax<=30?6:xMax<=72?12:Math.ceil(xMax/60)*12;let xl='';for(let m=0;m<=xMax;m+=step)xl+=`<text x="${X(m)}" y="${H+20}" text-anchor="${m?'middle':'start'}">${m?mTick(m):'Now'}</text>`;
   const dots=ok.filter(d=>plan.paid[d.id]&&plan.paid[d.id]<=xMax).map(d=>{const m=plan.paid[d.id];return `<circle cx="${X(m)}" cy="${Y(plan.series[m])}" r="4" fill="#fff" stroke="#0e7a5c" stroke-width="2"><title>${esc(d.name)} cleared ${esc(mDate(m))}</title></circle>`}).join('');
-  box.innerHTML=`<div class="figs dbfigs"><div><small>Debt free by</small><b class="pos">${esc(mDate(plan.m))}</b></div><div><small>Time to go</small><b>${esc(mSpan(plan.m))}</b></div><div><small>Interest to pay</small><b>${money(plan.int)}</b></div></div>
-  <svg viewBox="0 -8 ${W} ${H+30}">${gl}<path class="fadein" d="${path(plan.series)}L${X(plan.m)} ${H}L${L} ${H}Z" fill="#0e7a5c" fill-opacity=".1"/>${base.series.length>1?`<path d="${path(base.series)}" fill="none" stroke="#b4553a" stroke-width="1.5" stroke-dasharray="4 4"/>`:''}<path class="ln" d="${path(plan.series)}" fill="none" stroke="#0e7a5c" stroke-width="2"/>${dots}${xl}</svg>
+  $('#dbFigs').innerHTML=`<div class="figs dbfigs"><div><small>Debt free by</small><b class="pos">${esc(mDate(plan.m))}</b></div><div><small>Time to go</small><b>${esc(mSpan(plan.m))}</b></div><div><small>Interest to pay</small><b>${money(plan.int)}</b></div></div>`;
+  box.innerHTML=`<svg viewBox="0 -8 ${W} ${H+30}">${gl}<path class="fadein" d="${path(plan.series)}L${X(plan.m)} ${H}L${L} ${H}Z" fill="#0e7a5c" fill-opacity=".1"/>${base.series.length>1?`<path d="${path(base.series)}" fill="none" stroke="#b4553a" stroke-width="1.5" stroke-dasharray="4 4"/>`:''}<path class="ln" d="${path(plan.series)}" fill="none" stroke="#0e7a5c" stroke-width="2"/>${dots}${xl}</svg>
   <div class="legend" style="margin-top:10px"><span><i style="background:#0e7a5c"></i>Your plan, ${money(plan.budget)} a month</span><span><i style="background:#b4553a"></i>Minimums only</span></div>
   <div class="grid c3 dbtiles" style="margin:16px 0 0">
     ${base.done?`<div class="tile"><small>Interest saved vs minimums</small><b class="${intSave>.5?'pos':''}">${money(Math.max(0,intSave))}</b></div><div class="tile"><small>Debt free sooner by</small><b>${mSave>0?esc(mSpan(mSave)):'Same time'}</b></div>`:`<div class="tile"><small>On minimums only</small><b class="neg">Never cleared</b></div>`}
-    <div class="tile"><small>Going ${p.strat==='snowball'?'avalanche':'snowball'} instead</small><b>${Math.abs(altDiff)<1?'Same interest':money(Math.abs(altDiff))+(altDiff>=0?' more':' less')}</b></div>
+    <div class="tile"><small>Paying ${p.strat==='snowball'?'highest interest':'smallest balance'} first instead</small><b>${Math.abs(altDiff)<1?'Same interest':money(Math.abs(altDiff))+(altDiff>=0?' more':' less')}</b></div>
   </div>
   ${!base.done?`<div class="note warn" style="margin-top:14px">${ic('info',16,2)}<span>On minimums alone some of this never gets paid off. The extra each month is what clears it.</span></div>`:''}
   ${miss.length?`<div class="note warn" style="margin-top:14px">${ic('info',16,2)}<span>${miss.length===1?esc(miss[0].name)+' has':miss.length+' debts have'} no balance yet, so ${miss.length===1?'it is':'they are'} left out.</span></div>`:''}`;
@@ -1828,6 +1836,7 @@ function debtEdit(id,acct){
     ${linkable.length?`<label class="field">Balance comes from<select class="inp" id="dbAcct"><option value="">I will enter it myself</option>${linkable.map(n=>`<option value="${esc(n)}" ${n===a?'selected':''} ${used.has(n)?'disabled':''}>${esc(n)} account${used.has(n)?' (already added)':''}</option>`).join('')}</select></label>`:''}
     <div id="dbBalRow" ${a?'hidden':''}><label class="field">Amount owing<input class="inp" id="dbBal" type="number" step="0.01" min="0" inputmode="decimal" value="${d&&!d.acct&&d.bal!=null?(+d.bal).toFixed(2):''}" placeholder="0.00"></label></div>
     <div class="muted" id="dbHint" style="font-size:12.5px">${a?'The balance follows this account, so payments you log or import bring it down on their own.':'Update this whenever you check your statement.'}${owe!=null&&a?' Owing now: '+money(owe,2)+'.':''}</div>
+    ${a&&owe==null?`<div class="note warn">${ic('info',16,2)}<span>The ${esc(a)} account has no balance yet. <button type="button" class="lnk" style="color:inherit;text-decoration:underline" data-act="acctEdit" data-n="${esc(a)}">Set it on the account</button></span></div>`:''}
     <div class="row2"><label class="field">Interest rate (% a year)<input class="inp" id="dbRate" type="number" step="0.01" min="0" inputmode="decimal" value="${d?d.rate:''}" placeholder="19.99" required></label>
     <label class="field">Minimum repayment<input class="inp" id="dbMin" type="number" step="0.01" min="0" inputmode="decimal" value="${d&&d.min?d.min:''}" placeholder="0.00"></label></div>
     <label class="field">Repayment is due<select class="inp" id="dbFreq">${Object.entries(DFREQ).map(([v,F])=>`<option value="${v}" ${v===(d&&d.freq||'month')?'selected':''}>Every ${F[0].replace('a ','')}</option>`).join('')}</select></label>
@@ -1845,7 +1854,7 @@ function debtSave(){
   if(!d){d={id:uid(),ts:Date.now()};S.debts.push(d)}
   Object.assign(d,{name,kind,rate:Math.round(rate*100)/100,min:Math.round(min*100)/100,freq});
   if(acct){d.acct=acct;delete d.bal}else{delete d.acct;if(rawB){d.bal=Math.round(parseFloat(rawB)*100)/100;d.at=iso(new Date())}else delete d.bal}
-  const owe=debtOwing(d);if(owe!=null&&owe>(+d.start||0))d.start=owe;
+  const owe=debtOwing(d);if(owe!=null&&!(+d.start))d.start=owe;
   $('#authModal').classList.remove('open');DE=null;
   toast(isNew?'Debt added':'Debt saved',name+(owe!=null?' · '+money(owe,2)+' owing':''),'good');if(isNew)gainXP(10);commit();
 }
@@ -3277,7 +3286,7 @@ document.addEventListener('click',e=>{
   const fs=e.target.closest('[data-fs]');if(fs){F.all=fs.dataset.fs==='a';F.lim=150;document.querySelectorAll('#fscope [data-fs]').forEach(b=>b.classList.toggle('on',b.dataset.fs===fs.dataset.fs));renderTxList();return}
   const ft=e.target.closest('[data-ft]');if(ft){F.type=ft.dataset.ft;document.querySelectorAll('[data-ft]').forEach(b=>b.classList.toggle('on',b===ft));renderTxList();return}
   const fq=e.target.closest('#wFreq [data-f],#iFreq [data-f]');if(fq){const box=fq.parentElement;box.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===fq));if(box.id==='wFreq'){W.f=fq.dataset.f;$('#wConv').innerHTML=convText(parseAmt($('#wAmt').value),W.f);$('#wAmt').focus()}else{IM.f=fq.dataset.f;$('#iConv').innerHTML=convText(parseAmt($('#iAmt').value),IM.f)}return}
-  const dbs=e.target.closest('[data-dbs]');if(dbs){dPlan().strat=dbs.dataset.dbs;document.querySelectorAll('[data-dbs]').forEach(b=>b.classList.toggle('on',b===dbs));const sb=dbs.closest('.card').querySelector('.ch .s');if(sb)sb.textContent=dbs.dataset.dbs==='snowball'?'Smallest balance first':'Highest interest first';save();renderDebtOut();return}
+  const dbs=e.target.closest('[data-dbs]');if(dbs){dPlan().strat=dbs.dataset.dbs;document.querySelectorAll('[data-dbs]').forEach(b=>b.classList.toggle('on',b===dbs));const sb=dbs.closest('.card').querySelector('.ch .s');if(sb)sb.textContent=dbs.dataset.dbs==='snowball'?'Quicker wins':'Saves the most interest';save();renderDebtOut();return}
   const pr=e.target.closest('[data-per]');if(pr){S.period=pr.dataset.per;save();render(true);return}
   if(e.target.id==='wiz'){wizClose();return}
   if(e.target.id==='ach'){closeAch();return}
