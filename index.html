@@ -345,7 +345,7 @@ button.shline{font-weight:500}
 .amtwrap span{font-size:28px;color:var(--subtle);font-weight:500}
 .amtwrap input{border:0;outline:0;font-size:40px;font-weight:600;letter-spacing:-.03em;width:220px;text-align:left;color:var(--ink);background:none}
 .catpick{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:16px}
-.catpick button{display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 2px 8px;border-radius:10px;border:1px solid var(--line);font-size:11px;color:var(--muted);background:var(--surface)}
+.catpick button{display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 2px 8px;border-radius:10px;border:1px solid var(--line);font-size:11px;line-height:1.2;color:var(--muted);background:var(--surface);text-align:center;min-width:0;overflow-wrap:anywhere}
 .catpick button.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-2)}
 .catpick button.on svg{color:var(--accent)}
 .row2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
@@ -689,6 +689,8 @@ const CATS = {
   Entertainment:{i:'film',c:'#8668ad',k:'want',s:'Fun'}, Subscriptions:{i:'repeat',c:'#4a9792',k:'want',s:'Subs'}, Debt:{i:'card',c:'#9a5a5a',k:'need'},
   Pets:{i:'paw',c:'#a07a4f',k:'want'}, Savings:{i:'bank',c:'#2f7f8f',k:'save'}, Other:{i:'box',c:'#8d95a2',k:'want'}
 };
+/* One display name per category, used everywhere. The stored name stays the same so budgets, rules and synced data are untouched. */
+const catName=c=>(CATS[c]&&CATS[c].s)||c;
 const INCATS = { Salary:{i:'briefcase',c:'#0e7a5c'}, 'Side hustle':{i:'rocket',c:'#3f63a8'}, 'Other income':{i:'wallet',c:'#c08a1f'} };
 const FREQ = {daily:['Daily',7],weekly:['Weekly',1],fortnightly:['Fortnightly',.5],monthly:['Monthly',12/52],quarterly:['Quarterly',4/52],yearly:['Yearly',1/52]};
 const PERIODS = {week:['Weekly','week',1],fortnight:['Fortnightly','fortnight',2],month:['Monthly','month',52/12],year:['Yearly','year',52]};
@@ -1182,7 +1184,7 @@ function insightsCard(ym){
 
   const rows=cats.sort((p,q)=>Math.max(q[1],q[2])-Math.max(p[1],p[2])).slice(0,7),mx=Math.max(1,...rows.map(r=>Math.max(r[1],r[2])));
   const chg=(x,y)=>{if(!y)return '<span class="chip nt">New</span>';if(!x)return '<span class="chip up">'+ic('down',12,2.2)+'100%</span>';const d=(x-y)/y*100;return Math.abs(d)<1?'<span class="chip nt">Same</span>':'<span class="chip '+(d>0?'dn':'up')+'">'+ic(d>0?'up':'down',12,2.2)+Math.abs(d).toFixed(0)+'%</span>'};
-  const list=rows.map(([c,x,y])=>{const inf=CATS[c]||CATS.Other;return `<div class="cmp">${catChip(inf,28)}<div class="cb"><div class="ct"><span class="nm">${esc(c)}</span><span><span class="amt">${money(x)}</span> <span class="subtle">/ ${money(y)}</span></span></div>${bar(x/mx,inf.c,6)}<div class="bar pv"><i data-w="${(clamp(y/mx)*100).toFixed(1)}" style="background:#c9ced6"></i></div></div><span class="cc">${chg(x,y)}</span></div>`}).join('');
+  const list=rows.map(([c,x,y])=>{const inf=CATS[c]||CATS.Other;return `<div class="cmp">${catChip(inf,28)}<div class="cb"><div class="ct"><span class="nm">${esc(catName(c))}</span><span><span class="amt">${money(x)}</span> <span class="subtle">/ ${money(y)}</span></span></div>${bar(x/mx,inf.c,6)}<div class="bar pv"><i data-w="${(clamp(y/mx)*100).toFixed(1)}" style="background:#c9ced6"></i></div></div><span class="cc">${chg(x,y)}</span></div>`}).join('');
 
   return `<div class="card" style="margin-bottom:16px"><div class="ch"><h3>Spending insights</h3><span class="s">${ymLabel(ym,'s')} vs ${vsTxt}</span></div>
     <div class="insg">
@@ -1222,7 +1224,7 @@ V.dashboard=()=>{
 
   // donut
   const cats=Object.entries(t.byCat).filter(([c])=>!isSave(c)).sort((a,b)=>b[1]-a[1]),R=62,C=2*Math.PI*R;let off=0;
-  const segs=cats.map(([c,v])=>{const len=t.exp?v/t.exp*C:0,l=Math.max(len-2.5,0);const s='<circle class="seg" cx="75" cy="75" r="'+R+'" fill="none" stroke="'+(CATS[c]||CATS.Other).c+'" stroke-width="14" style="stroke-dasharray:0 '+C+'" data-dash="'+l+' '+(C-l)+'" stroke-dashoffset="'+(-off)+'" transform="rotate(-90 75 75)" data-tip="'+esc(c)+'|'+v+'"/>';off+=len;return s}).join('');
+  const segs=cats.map(([c,v])=>{const len=t.exp?v/t.exp*C:0,l=Math.max(len-2.5,0);const s='<circle class="seg" cx="75" cy="75" r="'+R+'" fill="none" stroke="'+(CATS[c]||CATS.Other).c+'" stroke-width="14" style="stroke-dasharray:0 '+C+'" data-dash="'+l+' '+(C-l)+'" stroke-dashoffset="'+(-off)+'" transform="rotate(-90 75 75)" data-tip="'+esc(catName(c))+'|'+v+'"/>';off+=len;return s}).join('');
 
   // budgets
   const bh=Object.entries(MV.cats).map(([c,cb])=>[c,cb.b?cb.v/cb.b:0,cb]).sort((a,b)=>b[1]-a[1]).slice(0,5);
@@ -1311,10 +1313,10 @@ V.dashboard=()=>{
   <div class="grid c2">
     <div class="card"><div class="ch"><h3>Spending by category</h3><button class="lnk" data-act="nav" data-view="transactions">Details ${ic('chevR',14)}</button></div>
       ${t.exp?`<div class="dwrap"><div class="donut"><svg width="150" height="150" viewBox="0 0 150 150"><circle cx="75" cy="75" r="${R}" fill="none" stroke="#eff1f4" stroke-width="14"/>${segs}</svg><div class="c"><div><b id="dVal">${money(t.exp)}</b><small id="dLab">Total spent</small></div></div></div>
-      <div class="lst">${cats.slice(0,6).map(([c,v])=>`<div class="lrow">${catChip(CATS[c]||CATS.Other,28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(c)}</div></div><span class="muted" style="font-size:12px;width:36px;text-align:right">${Math.round(v/t.exp*100)}%</span><span class="amt" style="width:72px;text-align:right">${money(v)}</span></div>`).join('')}</div></div>`:empty('pie','No spending logged this month')}
+      <div class="lst">${cats.slice(0,6).map(([c,v])=>`<div class="lrow">${catChip(CATS[c]||CATS.Other,28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(catName(c))}</div></div><span class="muted" style="font-size:12px;width:36px;text-align:right">${Math.round(v/t.exp*100)}%</span><span class="amt" style="width:72px;text-align:right">${money(v)}</span></div>`).join('')}</div></div>`:empty('pie','No spending logged this month')}
     </div>
     <div class="card"><div class="ch"><h3>Budgets</h3><button class="lnk" data-act="nav" data-view="budgets">Manage ${ic('chevR',14)}</button></div>
-      ${bh.map(([c,pc,cb])=>{const s=budStat(c,cb);return `<div class="lrow" style="flex-wrap:wrap">${catChip(CATS[c],28)}<div class="grow"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px"><span class="nm" style="font-size:13px">${c}</span><span style="font-size:12.5px"><span class="amt">${money(cb.v)}</span> <span class="subtle">/ ${money(cb.b)}</span></span></div>${bar(pc,s[2],5)}</div><span class="pill ${s[0]}" style="width:66px;justify-content:center">${s[1]}</span></div>`}).join('')||'<div class="empty">'+ic('pie',28,1.5)+'No budget yet<div style="margin-top:12px"><button class="btn pri sm" data-act="wizOpen">Start budget setup</button></div></div>'}
+      ${bh.map(([c,pc,cb])=>{const s=budStat(c,cb);return `<div class="lrow" style="flex-wrap:wrap">${catChip(CATS[c],28)}<div class="grow"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px"><span class="nm" style="font-size:13px">${esc(catName(c))}</span><span style="font-size:12.5px"><span class="amt">${money(cb.v)}</span> <span class="subtle">/ ${money(cb.b)}</span></span></div>${bar(pc,s[2],5)}</div><span class="pill ${s[0]}" style="width:66px;justify-content:center">${s[1]}</span></div>`}).join('')||'<div class="empty">'+ic('pie',28,1.5)+'No budget yet<div style="margin-top:12px"><button class="btn pri sm" data-act="wizOpen">Start budget setup</button></div></div>'}
     </div>
   </div>
 
@@ -1353,7 +1355,7 @@ function gsCard(){
 }
 
 function txTable(list,del){
-  return `<table class="table"><thead><tr><th>Description</th><th class="hm">Category</th><th class="hm">Date</th><th class="r">Amount</th>${del?'<th style="width:36px"></th>':''}</tr></thead><tbody>${list.map(t=>{const ci=catInfo(t),inc=t.type==='income';const xf=t.type==='transfer';return `<tr class="clk" data-act="txEdit" data-id="${t.id}"><td><div class="desc">${catChip(ci)}<div><b>${esc(txName(t))}</b><div class="muted" style="font-size:12px">${t.goal?'Saved to goal':xf?'Transfer':t.auto?'Repeating':inc?'Income':'Expense'}${shTag('txns',t)}</div></div></div></td><td class="hm"><span class="pill nt">${esc(t.cat)}</span></td><td class="hm muted">${dLabel(t.date)}</td><td class="r"><span class="amt ${inc?'in':''}" ${xf?'style="color:var(--muted)"':''}>${xf?'':inc?'+':'-'}${money(t.amount,2)}</span></td>${del?`<td class="r">${BOARD&&t.from?`<span class="subtle" title="Shared from a personal board">${ic('users',15)}</span>`:`<button class="del" data-act="delTx" data-id="${t.id}" aria-label="Delete">${ic('trash',15)}</button>`}</td>`:''}</tr>`}).join('')}</tbody></table>`;
+  return `<table class="table"><thead><tr><th>Description</th><th class="hm">Category</th><th class="hm">Date</th><th class="r">Amount</th>${del?'<th style="width:36px"></th>':''}</tr></thead><tbody>${list.map(t=>{const ci=catInfo(t),inc=t.type==='income';const xf=t.type==='transfer';return `<tr class="clk" data-act="txEdit" data-id="${t.id}"><td><div class="desc">${catChip(ci)}<div><b>${esc(txName(t))}</b><div class="muted" style="font-size:12px">${t.goal?'Saved to goal':xf?'Transfer':t.auto?'Repeating':inc?'Income':'Expense'}${shTag('txns',t)}</div></div></div></td><td class="hm"><span class="pill nt">${esc(catName(t.cat))}</span></td><td class="hm muted">${dLabel(t.date)}</td><td class="r"><span class="amt ${inc?'in':''}" ${xf?'style="color:var(--muted)"':''}>${xf?'':inc?'+':'-'}${money(t.amount,2)}</span></td>${del?`<td class="r">${BOARD&&t.from?`<span class="subtle" title="Shared from a personal board">${ic('users',15)}</span>`:`<button class="del" data-act="delTx" data-id="${t.id}" aria-label="Delete">${ic('trash',15)}</button>`}</td>`:''}</tr>`}).join('')}</tbody></table>`;
 }
 
 let F={q:'',type:'all',cat:'all'};
@@ -1362,7 +1364,7 @@ V.transactions=()=>`
     <div class="toolbar">
       <label class="search">${ic('search',16)}<input id="fq" placeholder="Search transactions" value="${esc(F.q)}"></label>
       <div class="segc" id="ftype">${[['all','All'],['expense','Expenses'],['income','Income'],['transfer','Transfers']].map(([k,l])=>`<button data-ft="${k}" class="${F.type===k?'on':''}">${l}</button>`).join('')}</div>
-      <select class="inp" id="fc"><option value="all">All categories</option>${[...Object.keys(CATS),...Object.keys(INCATS)].map(c=>`<option value="${esc(c)}" ${F.cat===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+      <select class="inp" id="fc"><option value="all">All categories</option>${[...Object.keys(CATS),...Object.keys(INCATS)].map(c=>`<option value="${esc(c)}" ${F.cat===c?'selected':''}>${esc(catName(c))}</option>`).join('')}</select>
       ${(n=>n?`<button class="btn sec" data-act="sortOpen">${ic('spark',16)}Sort ${n} unknown</button>`:'')(unknownList().length)}<label class="btn sec" style="cursor:pointer">${ic('upload',16)}Import CSV<input type="file" accept=".csv,text/csv" id="bankFile" multiple hidden></label>
     </div>
     <div id="txList"></div>
@@ -1423,7 +1425,7 @@ function spottedCard(){
   return `<div class="card" style="margin-top:16px"><div class="ch"><div><h3>Repeating bills we spotted</h3><div class="s" style="margin-top:2px">Found in your bank imports. Track one and it shows in Bills coming up, with the due date moving on each time the payment comes in.</div></div></div>
   ${show.map((b,i)=>{const ci=CATS[b.cat]||CATS.Other,noBud=!S.items.some(it=>it.cat===b.cat);
     if(b.twin)return `<div class="lrow spot">${catChip(ci)}<div class="grow"><div class="nm">${esc(b.name)}</div><div class="sb">${esc(b.twin.note||b.twin.cat)} logs itself every ${FL[b.freq]} and your imports bring it in too, so it may be counted twice</div></div><button class="btn pri sm" data-act="spotFix" data-i="${i}">Fix it</button><button class="btn sec sm" data-act="spotNo" data-i="${i}">Leave it</button></div>`;
-    return `<div class="lrow spot">${catChip(ci)}<div class="grow"><div class="nm">${esc(b.name)}</div><div class="sb">Every ${FL[b.freq]} · ${b.fixed?'':'about '}${money(b.amount,2)} · ${esc(b.cat)} · seen ${b.n} times · next ${dLabel(b.next)}${noBud?' · will be added to your budget':''}</div></div><button class="btn pri sm" data-act="spotAdd" data-i="${i}">Track</button><button class="btn sec sm" data-act="spotNo" data-i="${i}">Not a bill</button></div>`}).join('')}
+    return `<div class="lrow spot">${catChip(ci)}<div class="grow"><div class="nm">${esc(b.name)}</div><div class="sb">Every ${FL[b.freq]} · ${b.fixed?'':'about '}${money(b.amount,2)} · ${esc(catName(b.cat))} · seen ${b.n} times · next ${dLabel(b.next)}${noBud?' · will be added to your budget':''}</div></div><button class="btn pri sm" data-act="spotAdd" data-i="${i}">Track</button><button class="btn sec sm" data-act="spotNo" data-i="${i}">Not a bill</button></div>`}).join('')}
   ${SPOT.length>show.length?`<div class="muted" style="font-size:12.5px;margin-top:10px">${SPOT.length-show.length} more once you sort these</div>`:''}</div>`;
 }
 function recCard(){
@@ -1434,7 +1436,7 @@ function recCard(){
 }
 function renderTxList(){
   const q=F.q.toLowerCase();
-  const list=monthTx(S.month).filter(t=>(F.type==='all'||t.type===F.type)&&(F.cat==='all'||t.cat===F.cat)&&(!q||(t.note||'').toLowerCase().includes(q)||txName(t).toLowerCase().includes(q)||t.cat.toLowerCase().includes(q))).sort((a,b)=>b.date.localeCompare(a.date));
+  const list=monthTx(S.month).filter(t=>(F.type==='all'||t.type===F.type)&&(F.cat==='all'||t.cat===F.cat)&&(!q||(t.note||'').toLowerCase().includes(q)||txName(t).toLowerCase().includes(q)||t.cat.toLowerCase().includes(q)||catName(t.cat).toLowerCase().includes(q))).sort((a,b)=>b.date.localeCompare(a.date));
   const inc=list.filter(t=>t.type==='income').reduce((a,t)=>a+t.amount,0),exp=list.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
   $('#txList').innerHTML=list.length?`<div style="display:flex;gap:24px;margin-bottom:16px;font-size:13px;flex-wrap:wrap"><span class="muted">${list.length} transactions in ${ymLabel(S.month)}</span><span style="margin-left:auto">In <b class="pos" style="font-weight:600">${money(inc,2)}</b></span><span>Out <b style="font-weight:600;color:var(--ink)">${money(exp,2)}</b></span></div>`+txTable(list,true):empty('search','Nothing matches for this month');
 }
@@ -1467,7 +1469,7 @@ V.budgets=()=>{
     ${BV.un>.5||BV.extra>.5?`<div class="muted" style="font-size:12.5px;margin-top:8px">${BV.extra>.5?'Includes '+money(BV.extra)+' of bills that fell due in this period. ':''}${BV.un>.5?money(BV.un)+' spent in categories with no budget is shown below but not counted.':''}</div>`:''}
     <div class="brow hd" style="margin-top:22px"><span>Category</span><span>Progress</span><span class="r sp">Spent</span><span class="r">Budget</span><span class="r lf">Remaining</span><span class="st">Status</span></div>
     ${cats.map(c=>{const cb=bw[c]>0?(BV.cats[c]||Object.assign(catBud(c,Lw,sp[c]||0),{v:sp[c]||0})):null,b=cb?cb.b:0,v=sp[c]||0,pc=b?v/b:(v?1:0),stt=cb?budStat(c,cb):STAT(c,pc),sv=isSave(c),its=S.items.filter(x=>x.cat===c),open=OPEN.has(c);return `
-    <div class="brow clk" data-act="toggleCat" data-cat="${esc(c)}"><span class="nm"><span class="chev ${open?'o':''}">${ic('chevR',14)}</span>${catChip(CATS[c])}<span>${esc(c)}<span class="subtle" style="display:block;font-size:12px;font-weight:400">${its.length} item${its.length===1?'':'s'}</span></span></span>
+    <div class="brow clk" data-act="toggleCat" data-cat="${esc(c)}"><span class="nm"><span class="chev ${open?'o':''}">${ic('chevR',14)}</span>${catChip(CATS[c])}<span>${esc(catName(c))}<span class="subtle" style="display:block;font-size:12px;font-weight:400">${its.length} item${its.length===1?'':'s'}</span></span></span>
       <span class="bb">${bar(pc,b?stt[2]:'#c9ced6',6,rng.frac<1?rng.frac:null)}</span><span class="r sp amt">${money(v)}</span><span class="r amt">${b?money(b):'<span class="subtle">None</span>'}</span>
       <span class="r lf ${sv?(b&&v>=b?'pos':'muted'):b&&v>b?'neg':'muted'}">${b?(sv?(v>=b?'Done':money(b-v)+' to go'):v<=b?money(b-v):'-'+money(v-b)):''}</span><span class="st">${b?`<span class="pill ${stt[0]}">${stt[1]}</span>`:'<span class="pill nt">Not budgeted</span>'}</span></div>
     ${open?`<div class="items">${its.map(itemRow).join('')||'<div class="muted" style="font-size:12.5px;padding:8px 0">No budget items here yet.</div>'}<button class="lnk" data-act="itemNew" data-cat="${esc(c)}" style="margin-top:8px">${ic('plus',14,2)}Add item</button></div>`:''}`}).join('')}
@@ -1547,7 +1549,7 @@ V.planner=()=>{
   </div>
   <div class="card"><div class="ch"><h3>Cut-back simulator</h3><span class="s">See what a small change is worth</span></div>
     <div class="row2" style="grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:20px;align-items:end;margin-bottom:18px">
-      <label class="field">Category<select class="inp" id="pcut">${Object.keys(CATS).filter(c=>!isSave(c)).map(c=>`<option ${P.cut===c?'selected':''}>${c}</option>`).join('')}</select></label>
+      <label class="field">Category<select class="inp" id="pcut">${Object.keys(CATS).filter(c=>!isSave(c)).map(c=>`<option value="${esc(c)}" ${P.cut===c?'selected':''}>${esc(catName(c))}</option>`).join('')}</select></label>
       <label class="field"><span style="display:flex;justify-content:space-between">Reduce spending by <b id="pctLab" style="color:var(--ink);font-weight:600">${P.pct}%</b></span><input class="range" type="range" min="0" max="100" step="5" id="ppct" value="${P.pct}" style="height:38px"></label>
     </div>
     <div id="cutOut" class="grid c3" style="margin:0"></div>
@@ -1568,7 +1570,7 @@ function renderProjection(){
 function renderCut(){
   const avg=[1,2,3].map(i=>totals(shiftYM(curYM(),-i)).byCat[P.cut]||0).reduce((a,b)=>a+b,0)/3,m=avg*P.pct/100,r=.05/12;let v=0;for(let i=0;i<60;i++)v=v*(1+r)+m;
   $('#pctLab').textContent=P.pct+'%';
-  $('#cutOut').innerHTML=`<div class="tile"><small>Average monthly ${esc(P.cut)} spend</small><b>${money(avg)}</b></div><div class="tile"><small>Saved per year at ${P.pct}% less</small><b class="pos">${money(m*12)}</b></div><div class="tile"><small>Invested at 5% for 5 years</small><b>${money(v)}</b></div>`;
+  $('#cutOut').innerHTML=`<div class="tile"><small>Average monthly ${esc(catName(P.cut))} spend</small><b>${money(avg)}</b></div><div class="tile"><small>Saved per year at ${P.pct}% less</small><b class="pos">${money(m*12)}</b></div><div class="tile"><small>Invested at 5% for 5 years</small><b>${money(v)}</b></div>`;
 }
 
 V.settings=()=>`
@@ -1594,7 +1596,7 @@ V.settings=()=>`
       <label class="btn sec" style="cursor:pointer">${ic('upload',16)}Import bank CSVs<input type="file" accept=".csv,text/csv" id="bankFile" multiple hidden></label>
     </div>
     <div class="card"><div class="ch"><h3>Category rules</h3><span class="s">${(S.rules||[]).length} saved</span></div>
-      ${(S.rules||[]).length?`<div style="max-height:240px;overflow:auto">${S.rules.map(r=>`<div class="lrow">${catChip(r.type==='transfer'?XFER:r.type==='income'?(INCATS[r.cat]||INCATS['Other income']):(CATS[r.cat]||CATS.Other),28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(r.match)}</div><div class="sb">Goes to ${esc(r.cat)}</div></div><button class="del" style="opacity:1" data-act="ruleDel" data-id="${r.id}" aria-label="Delete rule">${ic('trash',14)}</button></div>`).join('')}</div>`:'<p class="muted" style="font-size:13px">No rules yet. Open an imported transaction, fix its category and tick Remember. Future imports then sort it for you.</p>'}
+      ${(S.rules||[]).length?`<div style="max-height:240px;overflow:auto">${S.rules.map(r=>`<div class="lrow">${catChip(r.type==='transfer'?XFER:r.type==='income'?(INCATS[r.cat]||INCATS['Other income']):(CATS[r.cat]||CATS.Other),28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(r.match)}</div><div class="sb">Goes to ${esc(catName(r.cat))}</div></div><button class="del" style="opacity:1" data-act="ruleDel" data-id="${r.id}" aria-label="Delete rule">${ic('trash',14)}</button></div>`).join('')}</div>`:'<p class="muted" style="font-size:13px">No rules yet. Open an imported transaction, fix its category and tick Remember. Future imports then sort it for you.</p>'}
     </div>
     <div class="card"><div class="ch"><h3>Install on your phone</h3></div>${installCard()}</div>
     <div class="card"><div class="ch"><h3>How progress works</h3></div>
@@ -1631,7 +1633,7 @@ function reportPoints(R){
   const pm=ymLabel(R.pv,'s'),mm=ymLabel(R.ym,'m'),vs=R.isCur?'the same point in '+pm:pm,pts=[],{T,P}=R;
   if(P.exp){const d=T.exp-P.exp;pts.push([d<=0?'good':'bad',d<=0?'down':'up',`You spent <b>${money(T.exp)}</b>${R.isCur?' so far':''}, <b>${money(Math.abs(d))} ${d<=0?'less':'more'}</b> than ${vs}`])}
   else pts.push(['','wallet',`You spent <b>${money(T.exp)}</b>${R.isCur?' so far':''} in ${mm}`]);
-  const top=R.cats.find(c=>c.a>0);if(top&&T.exp)pts.push(['','pie',`<b>${esc(top.c)}</b> was your biggest cost at <b>${money(top.a)}</b>, ${Math.round(top.a/T.exp*100)}% of your spending`]);
+  const top=R.cats.find(c=>c.a>0);if(top&&T.exp)pts.push(['','pie',`<b>${esc(catName(top.c))}</b> was your biggest cost at <b>${money(top.a)}</b>, ${Math.round(top.a/T.exp*100)}% of your spending`]);
   if(P.exp){const mv=R.cats.map(c=>[c.c,c.a-c.b,c.b]).filter(m=>Math.abs(m[1])>=20),up=mv.filter(m=>m[1]>0).sort((a,b)=>b[1]-a[1])[0],dn=mv.filter(m=>m[1]<0).sort((a,b)=>a[1]-b[1])[0];
     if(up)pts.push(['bad','up',`<b>${esc(up[0])}</b> went up the most, <b>${money(up[1])}</b> more than ${vs}`]);
     if(dn)pts.push(['good','down',`<b>${esc(dn[0])}</b> came down the most, <b>${money(-dn[1])}</b> less than ${vs}`]);}
@@ -1705,16 +1707,16 @@ V.report=()=>{
 
   <div class="card" style="margin-bottom:16px"><div class="ch"><h3>Spending by category</h3><span class="s">${money(T.exp)} total</span></div>
     ${R.cats.length?`<table class="table rpcats"><thead><tr><th>Category</th><th class="r">${mm}</th><th class="r hm">${pm}</th><th class="r">Change</th><th class="r hm">Budget used</th></tr></thead><tbody>
-    ${R.cats.map(c=>{const pc=c.bud?c.a/c.bud:0,s=c.cb?budStat(c.c,Object.assign({},c.cb,{v:c.a})):STAT(c.c,pc);return `<tr><td><div class="desc">${catChip(catOf(c.c),28)}<div style="flex:1;min-width:0"><b>${esc(c.c)}</b>${bar(c.a/catMax,catOf(c.c).c,4)}</div></div></td><td class="r"><span class="amt">${money(c.a)}</span></td><td class="r hm muted">${money(c.b)}</td><td class="r">${chg(c.a,c.b)}</td><td class="r hm">${c.bud?`<span class="pill ${s[0]}">${Math.round(pc*100)}% of ${money(c.bud)}</span>`:'<span class="subtle">No budget</span>'}</td></tr>`}).join('')}
+    ${R.cats.map(c=>{const pc=c.bud?c.a/c.bud:0,s=c.cb?budStat(c.c,Object.assign({},c.cb,{v:c.a})):STAT(c.c,pc);return `<tr><td><div class="desc">${catChip(catOf(c.c),28)}<div style="flex:1;min-width:0"><b>${esc(catName(c.c))}</b>${bar(c.a/catMax,catOf(c.c).c,4)}</div></div></td><td class="r"><span class="amt">${money(c.a)}</span></td><td class="r hm muted">${money(c.b)}</td><td class="r">${chg(c.a,c.b)}</td><td class="r hm">${c.bud?`<span class="pill ${s[0]}">${Math.round(pc*100)}% of ${money(c.bud)}</span>`:'<span class="subtle">No budget</span>'}</td></tr>`}).join('')}
     </tbody></table>`:empty('pie','No spending this month')}
   </div>
 
   <div class="grid c2">
     <div class="card"><div class="ch"><h3>Where it went</h3><span class="s">Top places by total</span></div>
-      ${R.merch.length?R.merch.slice(0,8).map(m=>`<div class="lrow">${catChip(catOf(m.cat),28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(m.name)}</div><div class="sb">${m.n} payment${m.n>1?'s':''} · ${esc(m.cat)}</div></div><span class="amt">${money(m.v,2)}</span></div>`).join(''):empty('cart','No spending this month')}
+      ${R.merch.length?R.merch.slice(0,8).map(m=>`<div class="lrow">${catChip(catOf(m.cat),28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(m.name)}</div><div class="sb">${m.n} payment${m.n>1?'s':''} · ${esc(catName(m.cat))}</div></div><span class="amt">${money(m.v,2)}</span></div>`).join(''):empty('cart','No spending this month')}
     </div>
     <div class="card"><div class="ch"><h3>Biggest purchases</h3><span class="s">Single payments</span></div>
-      ${R.big.length?R.big.map(t=>`<div class="lrow clk" data-act="txEdit" data-id="${t.id}">${catChip(catOf(t.cat),28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(txName(t))}</div><div class="sb">${dLabel(t.date)} · ${esc(t.cat)}${t.acct?' · '+esc(t.acct):''}</div></div><span class="amt">${money(t.amount,2)}</span></div>`).join(''):empty('cart','No spending this month')}
+      ${R.big.length?R.big.map(t=>`<div class="lrow clk" data-act="txEdit" data-id="${t.id}">${catChip(catOf(t.cat),28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(txName(t))}</div><div class="sb">${dLabel(t.date)} · ${esc(catName(t.cat))}${t.acct?' · '+esc(t.acct):''}</div></div><span class="amt">${money(t.amount,2)}</span></div>`).join(''):empty('cart','No spending this month')}
     </div>
   </div>
 
@@ -1801,7 +1803,7 @@ function drawCats(){
   $('#fCats').style.display=fType==='transfer'?'none':'';
   if(fType==='transfer'){fCat='Transfer';$('#fSave').textContent=MM.mode!=='new'?'Save changes':'Add transfer';return}
   const src=fType==='income'?INCATS:CATS;if(!src[fCat])fCat=Object.keys(src)[0];
-  $('#fCats').innerHTML=Object.entries(src).map(([c,i])=>`<button type="button" data-cat="${c}" class="${c===fCat?'on':''}">${ic(i.i,18)}${esc(i.s||c)}</button>`).join('');
+  $('#fCats').innerHTML=Object.entries(src).map(([c,i])=>`<button type="button" data-cat="${c}" class="${c===fCat?'on':''}">${ic(i.i,18)}${esc(catName(c))}</button>`).join('');
   $('#fSave').textContent=MM.mode!=='new'?'Save changes':fType==='income'?'Add income':'Add expense';
 }
 $('#typeSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(b){fType=b.dataset.type;drawCats();ruleNudge()}});
@@ -1819,20 +1821,20 @@ $('#txForm').addEventListener('submit',e=>{
     if($('#fRuleRow').style.display!=='none'&&$('#fRuleOn').checked&&key){
       S.rules=(S.rules||[]).filter(r=>r.match!==key);S.rules.push({id:uid(),match:key,type:fType,cat:fCat});
       let n=0;S.txns.forEach(x=>{if(x!==t&&x.src==='bank'&&!x.goal&&!x.from&&matchKey(x.note,key)&&(fType==='transfer'||x.type===fType)&&(x.cat!==fCat||x.type!==fType)){x.type=fType;x.cat=fCat;n++}});
-      toast('Saved and remembered','"'+key+'" will go to '+fCat+(n?'. Updated '+n+' other transaction'+(n>1?'s':''):''),'good');
-    } else toast('Transaction updated',money(amt,2)+' · '+t.cat,'good');
+      toast('Saved and remembered','"'+key+'" will go to '+catName(fCat)+(n?'. Updated '+n+' other transaction'+(n>1?'s':''):''),'good');
+    } else toast('Transaction updated',money(amt,2)+' · '+catName(t.cat),'good');
     commit();return;
   }
   if(MM.mode==='rule'){
     const r=S.recurring.find(x=>x.id===MM.id);if(!r)return;
     Object.assign(r,{type:fType,amount:amt,cat:fCat,note,freq:rep==='none'?r.freq:rep,next:date,day:+date.slice(8)});delete r.full;readShare('fShare','recurring',r);
-    $('#modal').classList.remove('open');recurringNotice(runRecurring());toast('Repeating item updated',(note||fCat)+', next on '+dLabel(r.next),'good');commit();return;
+    $('#modal').classList.remove('open');recurringNotice(runRecurring());toast('Repeating item updated',(note||catName(fCat))+', next on '+dLabel(r.next),'good');commit();return;
   }
   const t={id:uid(),date,type:fType,amount:amt,cat:fCat,note};
   S.txns.push(t);$('#modal').classList.remove('open');
   if(rep!=='none'){const r={id:uid(),type:fType,amount:amt,cat:fCat,note,freq:rep,day:+date.slice(8)};r.next=nextDate(date,rep,r.day);readShare('fShare','recurring',r);if(r.full!=null){t.full=r.full;t.amount=r.amount;t.sp='auto'}t.rec=r.id;S.recurring.push(r);recurringNotice(runRecurring())}
   else readShare('fShare','txns',t);
-  toast(t.type==='income'?'Income added':'Expense added',(t.type==='income'?'+':'')+money(amt,2)+' · '+t.cat+(rep!=='none'?' · repeats':''),'good');
+  toast(t.type==='income'?'Income added':'Expense added',(t.type==='income'?'+':'')+money(amt,2)+' · '+catName(t.cat)+(rep!=='none'?' · repeats':''),'good');
   S.month=t.date.slice(0,7);const xb=$('#addBtn').offsetParent?$('#addBtn'):$('#fab');gainXP(5,xb);completeMission('log');commit();
 });
 
@@ -1866,14 +1868,14 @@ function renderWiz(){
     const bw=budgetsW(),inW=incomeW(),exW=sum(bw);
     box.innerHTML=`<div class="mh"><div><h2>Your budget, week by week</h2><div class="muted" style="font-size:12.5px">Everything converted to weekly amounts</div></div><button class="del" style="opacity:1" data-act="wizClose" aria-label="Close">${ic('x',16)}</button></div>
     <div class="grid c3" style="margin-bottom:14px;gap:8px"><div class="tile"><small>Income</small><b class="pos">${money(inW)}</b></div><div class="tile"><small>Commitments</small><b>${money(exW)}</b></div><div class="tile"><small>Left over</small><b class="${inW-exW<0?'neg':''}">${money(inW-exW)}</b></div></div>
-    <div class="wsum">${Object.keys(CATS).filter(c=>bw[c]>0).map(c=>`<div class="lrow">${catChip(CATS[c],28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(c)}</div></div><span class="muted" style="font-size:12px">${money(bw[c]*52/12)} / month</span><span class="amt" style="width:96px;text-align:right">${money(bw[c],2)} / wk</span></div>`).join('')||empty('pie','Nothing entered yet')}</div>
+    <div class="wsum">${Object.keys(CATS).filter(c=>bw[c]>0).map(c=>`<div class="lrow">${catChip(CATS[c],28)}<div class="grow"><div class="nm" style="font-size:13px">${esc(catName(c))}</div></div><span class="muted" style="font-size:12px">${money(bw[c]*52/12)} / month</span><span class="amt" style="width:96px;text-align:right">${money(bw[c],2)} / wk</span></div>`).join('')||empty('pie','Nothing entered yet')}</div>
     <div class="wfoot" style="margin-top:18px"><button class="btn sec" data-act="wizBack">${ic('chevL',16)}Back</button><span style="flex:1"></span><button class="btn pri" data-act="wizDone">${ic('check',16,2)}Finish</button></div>`;
     return;
   }
   const w=WIZ[W.i],gi=grpInfo(w.cat),ex=itemByKey(w.key);W.f=ex?ex.freq:w.freq;
-  box.innerHTML=`<div class="mh"><div><h2>Budget setup</h2><div class="muted" style="font-size:12.5px">Item ${W.i+1} of ${WIZ.length} · ${esc(w.cat)}</div></div><button class="del" style="opacity:1" data-act="wizClose" aria-label="Save and close">${ic('x',16)}</button></div>
+  box.innerHTML=`<div class="mh"><div><h2>Budget setup</h2><div class="muted" style="font-size:12.5px">Item ${W.i+1} of ${WIZ.length} · ${esc(catName(w.cat))}</div></div><button class="del" style="opacity:1" data-act="wizClose" aria-label="Save and close">${ic('x',16)}</button></div>
   <div class="bar" style="height:4px;margin-bottom:14px"><i style="width:${W.i/WIZ.length*100}%;background:var(--accent);transition:width .3s"></i></div>
-  <div class="rail">${GROUPS.map(g=>{const inf=grpInfo(g),first=WIZ.findIndex(x=>x.cat===g),done=WIZ.some(x=>x.cat===g&&itemByKey(x.key));return `<button data-act="wizJump" data-i="${first}" class="${g===w.cat?'on':''}" title="${esc(g)}" aria-label="${esc(g)}">${ic(inf.i,15)}${done?'<span class="dt"></span>':''}</button>`}).join('')}</div>
+  <div class="rail">${GROUPS.map(g=>{const inf=grpInfo(g),first=WIZ.findIndex(x=>x.cat===g),done=WIZ.some(x=>x.cat===g&&itemByKey(x.key));return `<button data-act="wizJump" data-i="${first}" class="${g===w.cat?'on':''}" title="${esc(catName(g))}" aria-label="${esc(catName(g))}">${ic(inf.i,15)}${done?'<span class="dt"></span>':''}</button>`}).join('')}</div>
   <div class="reel ${W.dir}">
     <div class="rp">${(k=>WIZ[k]?esc(WIZ[k].name):'')(S.flags.hh==='solo'&&isPartnerItem(W.i-1)?W.i-2:W.i-1)}</div>
     <div class="rc"><span class="cat" style="width:44px;height:44px;border-radius:12px;background:${gi.c}14;color:${gi.c}">${ic(gi.i,22)}</span><div style="min-width:0"><div class="rn">${esc(w.name)}</div><div class="rh">${esc(w.hint)}</div></div></div>
@@ -1883,7 +1885,7 @@ function renderWiz(){
   <div class="freq" id="wFreq">${Object.entries(FREQ).map(([k,[l]])=>`<button type="button" data-f="${k}" class="${k===W.f?'on':''}">${l}</button>`).join('')}</div>
   <div class="conv" id="wConv">${convText(ex?(ex.full??ex.amt):0,W.f)}</div>
   <div class="wfoot"><button class="btn sec" data-act="wizBack" ${W.i?'':'disabled'}>${ic('chevL',16)}Back</button><span style="flex:1"></span><button class="btn sec" data-act="wizSkip">Skip</button><button class="btn pri" data-act="wizNext">Next${ic('chevR',16)}</button></div>
-  <div class="wlinks"><button class="lnk" data-act="wizSkipSec">Skip the rest of ${esc(w.cat)}</button><button class="lnk" data-act="wizFinish">Finish now and see my budget</button></div>
+  <div class="wlinks"><button class="lnk" data-act="wizSkipSec">Skip the rest of ${esc(catName(w.cat))}</button><button class="lnk" data-act="wizFinish">Finish now and see my budget</button></div>
   <div class="kbd hm">Enter saves and moves on · Up and down arrows spin through items</div>`;
   setTimeout(()=>{const a=$('#wAmt');if(a){a.focus();a.select()}},20);
 }
@@ -1903,7 +1905,7 @@ function itemOpen(id,cat){
   $('#itemBox').innerHTML=`<div class="mh"><h2>${it?'Edit budget item':'Add budget item'}</h2><button class="del" style="opacity:1" data-act="itemClose" aria-label="Close">${ic('x',16)}</button></div>
   <form id="itemForm" autocomplete="off" style="display:flex;flex-direction:column;gap:12px">
     <label class="field">Name<input class="inp" id="iName" required maxlength="50" value="${esc(it?it.name:'')}" placeholder="e.g. Car insurance"></label>
-    <label class="field">Category<select class="inp" id="iCat">${GROUPS.map(g=>`<option value="${esc(g)}" ${sel===g?'selected':''}>${esc(g)}</option>`).join('')}</select></label>
+    <label class="field">Category<select class="inp" id="iCat">${GROUPS.map(g=>`<option value="${esc(g)}" ${sel===g?'selected':''}>${esc(catName(g))}</option>`).join('')}</select></label>
     <div class="amtwrap" style="border:0;padding:6px 0 4px;margin:0"><span>${esc(curSymbol())}</span><input id="iAmt" type="text" inputmode="decimal" placeholder="0" value="${it?(it.full??it.amt):''}" aria-label="Amount"></div>
     <div class="freq" id="iFreq">${Object.entries(FREQ).map(([k,[l]])=>`<button type="button" data-f="${k}" class="${k===IM.f?'on':''}">${l}</button>`).join('')}</div>
     <div class="conv" id="iConv" style="margin:4px 0 6px">${convText(it?(it.full??it.amt):0,IM.f)}</div>
@@ -2158,7 +2160,7 @@ async function importBankFiles(files){
   pairs.forEach(p=>{if(p.on){RV.pairIds.add(p.out.id);RV.pairIds.add(p.in.id)}});
   RV.groups=groupStaged();drawReview();$('#reviewModal').classList.add('open');
 }
-function catOptions(type,cur){const src=type==='income'?INCATS:CATS;return Object.keys(src).map(c=>`<option value="${esc(c)}" ${c===cur?'selected':''}>${esc(c)}</option>`).join('')+`<option value="__transfer" ${type==='transfer'?'selected':''}>Transfer between my accounts</option>`}
+function catOptions(type,cur){const src=type==='income'?INCATS:CATS;return Object.keys(src).map(c=>`<option value="${esc(c)}" ${c===cur?'selected':''}>${esc(catName(c))}</option>`).join('')+`<option value="__transfer" ${type==='transfer'?'selected':''}>Transfer between my accounts</option>`}
 const rvIn=()=>RV.staged.filter(t=>!t.dupOf||t.keep);
 function rvAcctBlock(){
   const R=RV,known=[...new Set(S.txns.map(x=>x.acct).filter(Boolean))].sort(),boards=SB.user&&BD.list.length?BD.list:[];
@@ -2738,7 +2740,7 @@ function feedSection(){
   const accts=[...new Set(S.txns.map(x=>x.acct).filter(Boolean))].sort(),ja=S.settings.jointAccts||{},sp=S.settings.acctSplit||{},rules=S.settings.shareRules||[];
   const n=FEEDK.reduce((a,k)=>a+(S[k]||[]).filter(x=>isObj(x)&&shOf(k,x)).length,0);
   const opt=b=>BD.list.map(x=>`<option value="${x.id}" ${b===x.id?'selected':''}>${esc(x.name)}</option>`).join('');
-  const valInput=RF.f==='cat'?`<select class="inp" id="rfV">${Object.keys(CATS).filter(c=>c!=='Savings').map(c=>`<option>${esc(c)}</option>`).join('')}</select>`
+  const valInput=RF.f==='cat'?`<select class="inp" id="rfV">${Object.keys(CATS).filter(c=>c!=='Savings').map(c=>`<option value="${esc(c)}">${esc(catName(c))}</option>`).join('')}</select>`
     :RF.f==='acct'?`<select class="inp" id="rfV">${accts.length?accts.map(a=>`<option>${esc(a)}</option>`).join(''):'<option value="">No accounts yet</option>'}</select>`
     :`<input class="inp" id="rfV" maxlength="40" placeholder="e.g. origin energy">`;
   return `<div class="shsec"><div class="eyebrow" style="margin-bottom:4px">Feed your joint board</div>
@@ -2802,7 +2804,7 @@ function drawSorter(){
       <div class="swlist">${c.items.slice(0,3).map(x=>`<div><span>${dLabel(x.date)}</span><span class="grow">${esc(x.note)}</span><span>${inc?'+':''}${money(fullAmt(x),2)}</span></div>`).join('')}${c.items.length>3?`<div class="subtle">and ${c.items.length-3} more</div>`:''}</div>
       <div class="swsug">${c.sug?`Suggested: <b>${esc(sl)}</b> <span class="subtle">· ${esc(c.sug.why)}</span>`:'<span class="subtle">No good guess. Pick a category below.</span>'}</div>
     </div></div>
-    <div class="catpick swcats">${Object.entries(src).map(([k,v])=>`<button type="button" data-so="cat" data-cat="${esc(k)}">${ic(v.i,18)}${esc(v.s||k)}</button>`).join('')}<button type="button" data-so="cat" data-cat="__transfer">${ic('swap',18)}Transfer</button></div>
+    <div class="catpick swcats">${Object.entries(src).map(([k,v])=>`<button type="button" data-so="cat" data-cat="${esc(k)}">${ic(v.i,18)}${esc(catName(k))}</button>`).join('')}<button type="button" data-so="cat" data-cat="__transfer">${ic('swap',18)}Transfer</button></div>
     <label class="swrem ${c.generic?'off':''}"><input type="checkbox" id="soRem" ${SO.remember&&!c.generic?'checked':''} ${c.generic?'disabled':''}>${c.generic?'Too general to remember, this sorts just these ones':`Sort future ${esc(c.paypal?'PayPal':merchName(t0.note))} transactions the same way`}</label>
     <div class="row2 swbtns"><button class="btn sec" data-so="skip">${ic('chevL',16)}Skip</button><button class="btn sec" data-so="keep">Keep in Other</button></div>
     <p class="subtle swkeys">Swipe the card, or use the arrow keys: left to skip, right for ${esc(sl)}.</p>`;
