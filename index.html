@@ -266,6 +266,12 @@ button.shline{font-weight:500}
 .ring .c{position:absolute;inset:0;display:grid;place-items:center;font-weight:600;color:var(--ink);letter-spacing:-.02em}
 .goal .chips{display:flex;gap:6px;flex-wrap:wrap}
 .goal .custom{display:flex;gap:6px;margin-top:8px}
+.glbtn{display:inline-flex;align-items:center;gap:6px;margin-top:12px;font-size:12.5px;align-self:flex-start}
+.glopts{display:flex;flex-direction:column;gap:6px;max-height:340px;overflow:auto}
+.glopts .eyebrow{margin-top:6px}
+.glopt{display:flex;gap:10px;align-items:center;padding:9px 11px;border:1px solid var(--line);border-radius:10px;cursor:pointer}
+.glopt:has(input:checked){border-color:var(--accent);background:#e7f3ee66}
+.glopt b{display:block;font-size:13px;font-weight:500}.glopt small{color:var(--muted);font-size:12px}
 .goal .custom .inp{flex:1;height:30px;border-radius:8px;font-size:13px}
 .goal.done{background:linear-gradient(180deg,#f3faf7,#fff)}
 .newgoal{border-style:dashed;box-shadow:none;background:transparent}
@@ -818,7 +824,7 @@ function load(){try{const s=localStorage.getItem(lkey());return s?JSON.parse(s):
 const sig = () => JSON.stringify(S,(k,v)=>k==='view'||k==='month'||k==='savedAt'||k==='syncAt'||k==='syncUid'?undefined:v);
 let lastSig='';
 function store(){try{localStorage.setItem(lkey(),JSON.stringify(S))}catch(e){}}
-function save(silent){const j=sig();if(j!==lastSig){lastSig=j;if(!silent){S.savedAt=Date.now();schedulePush()}}store()}
+function save(silent){syncGoalLinks(true);const j=sig();if(j!==lastSig){lastSig=j;if(!silent){S.savedAt=Date.now();schedulePush()}}store()}
 let S = load(), firstRun=false;
 if(!S){S=fresh();firstRun=true}
 S = Object.assign(fresh(),S);
@@ -1382,7 +1388,7 @@ function gsCard(){
 }
 
 function txTable(list,del){
-  return `<table class="table"><thead><tr><th>Description</th><th class="hm">Category</th><th class="hm">Date</th><th class="r">Amount</th>${del?'<th style="width:36px"></th>':''}</tr></thead><tbody>${list.map(t=>{const ci=catInfo(t),inc=t.type==='income';const xf=t.type==='transfer';return `<tr class="clk" data-act="txEdit" data-id="${t.id}"><td><div class="desc">${catChip(ci)}<div><b>${esc(txName(t))}</b><div class="muted" style="font-size:12px">${t.goal?'Saved to goal':xf?'Transfer':t.auto?'Repeating':inc?'Income':'Expense'}${shTag('txns',t)}</div></div></div></td><td class="hm"><span class="pill nt">${esc(catName(t.cat))}</span></td><td class="hm muted">${dLabel(t.date)}</td><td class="r"><span class="amt ${inc?'in':''}" ${xf?'style="color:var(--muted)"':''}>${xf?'':inc?'+':'-'}${money(t.amount,2)}</span></td>${del?`<td class="r">${BOARD&&t.from?`<span class="subtle" title="Shared from a personal board">${ic('users',15)}</span>`:`<button class="del" data-act="delTx" data-id="${t.id}" aria-label="Delete">${ic('trash',15)}</button>`}</td>`:''}</tr>`}).join('')}</tbody></table>`;
+  return `<table class="table"><thead><tr><th>Description</th><th class="hm">Category</th><th class="hm">Date</th><th class="r">Amount</th>${del?'<th style="width:36px"></th>':''}</tr></thead><tbody>${list.map(t=>{const ci=catInfo(t),inc=t.type==='income';const xf=t.type==='transfer';return `<tr class="clk" data-act="txEdit" data-id="${t.id}"><td><div class="desc">${catChip(ci)}<div><b>${esc(txName(t))}</b><div class="muted" style="font-size:12px">${t.goal?'Saved to goal':LINKED.has(t.id)?'Counted to '+esc((S.goals.find(g=>g.id===LINKED.get(t.id))||{}).name||'a goal'):xf?'Transfer':t.auto?'Repeating':inc?'Income':'Expense'}${shTag('txns',t)}</div></div></div></td><td class="hm"><span class="pill nt">${esc(catName(t.cat))}</span></td><td class="hm muted">${dLabel(t.date)}</td><td class="r"><span class="amt ${inc?'in':''}" ${xf?'style="color:var(--muted)"':''}>${xf?'':inc?'+':'-'}${money(t.amount,2)}</span></td>${del?`<td class="r">${BOARD&&t.from?`<span class="subtle" title="Shared from a personal board">${ic('users',15)}</span>`:`<button class="del" data-act="delTx" data-id="${t.id}" aria-label="Delete">${ic('trash',15)}</button>`}</td>`:''}</tr>`}).join('')}</tbody></table>`;
 }
 
 let F={q:'',type:'all',cat:'all'};
@@ -1518,11 +1524,11 @@ V.goals=()=>{
   <div class="grid c3">
     ${S.goals.map(g=>{const p=clamp(g.saved/g.target),done=p>=1;return `
     <div class="card goal ${done?'done':''}">${BOARD&&g.from?'':`<button class="gx" data-act="delGoal" data-id="${g.id}" aria-label="Delete goal">${ic('x',14)}</button>`}
-      <div class="gh"><span class="cat" style="width:38px;height:38px;background:${g.color}14;color:${g.color}">${ic(g.icon,18)}</span><div><b>${esc(g.name)}</b><span class="muted" style="font-size:12.5px">${done?'Fully funded':money(g.target-g.saved)+' to go'}</span></div></div>${goalShareLine(g)}
+      <div class="gh"><span class="cat" style="width:38px;height:38px;background:${g.color}14;color:${g.color}">${ic(g.icon,18)}</span><div><b>${esc(g.name)}</b><span class="muted" style="font-size:12.5px">${done?'Fully funded':money(g.target-g.saved)+' to go'}</span></div></div>${goalShareLine(g)}${g.link?`<div class="shline">${ic('swap',13)}Follows ${esc(linkLabel(g.link))}${g.lcount?' · '+g.lcount+' counted':''}${BOARD&&g.from?'':` <button class="lnk" style="font-size:12px;margin-left:auto;padding-left:8px;flex-shrink:0" data-act="glOpen" data-id="${g.id}">Change</button>`}</div>`:''}
       <div class="gm"><div class="ring" style="width:84px;height:84px">${ring(p,84,g.color,7)}<div class="c" style="font-size:17px">${Math.round(p*100)}%</div></div>
         <div><div class="num" style="font-size:22px">${money(g.saved)}</div><div class="muted" style="font-size:12.5px">of ${money(g.target)}</div></div></div>
       ${done?'<span class="pill ok" style="align-self:flex-start">'+ic('check',12,2.2)+'&nbsp;Goal reached</span>':`<div class="chips">${[50,100,250,500].map(a=>`<button class="btn sec sm" data-act="contrib" data-id="${g.id}" data-amt="${a}">+${money(a)}</button>`).join('')}</div>
-      <div class="custom"><input class="inp" type="number" min="1" placeholder="Other amount" id="c_${g.id}" aria-label="Other amount"><button class="btn pri sm" data-act="contrib" data-id="${g.id}">Add</button></div>`}
+      <div class="custom"><input class="inp" type="number" min="1" placeholder="Other amount" id="c_${g.id}" aria-label="Other amount"><button class="btn pri sm" data-act="contrib" data-id="${g.id}">Add</button></div>${g.link||BOARD&&g.from?'':`<button class="lnk glbtn" data-act="glOpen" data-id="${g.id}">${ic('swap',14)}Link a savings account or transfer</button>`}`}
     </div>`}).join('')}
     <div class="card newgoal"><div class="ch"><h3>New goal</h3></div>
       <form id="goalForm" style="display:flex;flex-direction:column;gap:12px">
@@ -1801,7 +1807,7 @@ function animate(quiet){
   document.querySelectorAll('[data-count]').forEach(el=>{const to=+el.dataset.count,f=el.dataset.fmt,t0=performance.now(),dur=(reduce||quiet)?1:900;
     const step=now=>{const k=clamp((now-t0)/dur),e=1-Math.pow(1-k,3);el.textContent=fmtVal(to*e,f);if(k<1)requestAnimationFrame(step)};requestAnimationFrame(step)});
 }
-function commit(){applyAutoSplits();checkAlerts();evalChallenges();save();render(true)}
+function commit(){applyAutoSplits();syncGoalLinks();checkAlerts();evalChallenges();save();render(true)}
 
 /* ============ Static chrome ============ */
 $('#brandMark').innerHTML=ic('logo',16,2.2);$('#wMark').innerHTML=ic('logo',26,2.2);$('#mPrev').innerHTML=ic('chevL',16);$('#mNext').innerHTML=ic('chevR',16);
@@ -1866,13 +1872,67 @@ $('#txForm').addEventListener('submit',e=>{
 });
 
 /* ============ Goals ============ */
+function goalMilestones(g,quiet){
+  const after=g.saved/g.target;g.hit=g.hit||{};let ms=false;
+  for(const m of [25,50,75,100]){if(after*100>=m&&!g.hit[m]){g.hit[m]=1;ms=true;
+    if(m===100){notify('Goal reached: '+g.name,money(g.target)+' fully funded','win');if(!quiet)showAch({kind:'goal',title:g.name,sub:money(g.target)+' fully funded. Well done.',icon:g.icon,xp:0})}
+    else{notify(g.name+' is '+m+'% funded',money(g.saved)+' of '+money(g.target),'good','goalstep');if(!quiet)toast(g.name+' is '+m+'% funded',money(g.saved)+' of '+money(g.target),'good')}}}
+  return ms;
+}
+/* Goals linked to transfers: a goal follows a savings account, or transfers whose description matches. Totals update on their own */
+let LINKED=new Map();
+function linkHit(L,t,since){
+  if(!L||t.goal||t.from||(since&&t.date<since))return 0;
+  if(L.acct){if(t.acct!==L.acct)return 0;return dirOf(t)==='in'?1:-1}
+  if(L.key&&(t.type==='transfer'||t.type==='expense'&&isSave(t.cat))&&matchKey(t.note,L.key))return dirOf(t)==='in'?-1:1;
+  return 0;
+}
+function linkScan(L,since,skip){let n=0,sum=0;for(const t of S.txns){if(skip&&skip.has(t.id))continue;const h=linkHit(L,t,since);if(h){n++;sum+=h*t.amount}}return {n,sum:Math.round(sum*100)/100}}
+function syncGoalLinks(quiet){
+  const own=new Map(),took=new Set(),sum={},cnt={};
+  for(const g of S.goals){if(!g.link)continue;sum[g.id]=0;cnt[g.id]=0;
+    for(const t of S.txns){if(took.has(t.id))continue;const h=linkHit(g.link,t,g.link.since);if(h){own.set(t.id,g.id);took.add(t.id);if(t.pair)took.add(t.pair);sum[g.id]+=h*t.amount;cnt[g.id]++}}}
+  LINKED=own;
+  for(const g of S.goals){if(!g.link)continue;const L=Math.round(sum[g.id]*100)/100,d=Math.round((L-(g.lsum||0))*100)/100;g.lcount=cnt[g.id];
+    if(!d)continue;g.saved=Math.max(0,Math.round((g.saved+d)*100)/100);if(g.from)g.extra=Math.max(0,Math.round(((+g.extra||0)+d)*100)/100);g.lsum=L;
+    if(d>0)goalMilestones(g,quiet);}
+}
+const linkLabel=L=>L.acct?'your '+L.acct+' account':'transfers mentioning "'+L.key+'"';
+function linkOptions(){
+  const accts=[...new Set(S.txns.filter(t=>t.acct).map(t=>t.acct))].sort();
+  const keys={};S.txns.forEach(t=>{if(t.goal||t.from||!(t.type==='transfer'&&dirOf(t)==='out'||t.type==='expense'&&isSave(t.cat)))return;const k=suggestKey(t.note);if(!k||GENKEY.has(k))return;(keys[k]=keys[k]||{k,n:0,nm:'Transfers like "'+k.replace(/\b\w/g,c=>c.toUpperCase())+'"'}).n++});
+  return {accts,keys:Object.values(keys).filter(x=>x.n>1).sort((a,b)=>b.n-a.n).slice(0,6)};
+}
+let GL=null;
+function glOpen(id){
+  const g=S.goals.find(x=>x.id===id);if(!g)return;const O=linkOptions(),cur=g.link||{};GL={id};
+  const opt=(v,t,sb,on)=>`<label class="glopt"><input type="radio" name="glk" value="${esc(v)}" ${on?'checked':''}><div><b>${esc(t)}</b><small>${esc(sb)}</small></div></label>`;
+  $('#authBox').innerHTML=`<div class="mh"><h2>Link ${esc(g.name)}</h2><button class="del" style="opacity:1" data-act="authClose" aria-label="Close">${ic('x',16)}</button></div>
+  <form id="glForm" style="display:flex;flex-direction:column;gap:12px">
+    <p class="muted" style="font-size:13px">Pick where the money for this goal goes. Matching transfers add to the goal on their own, so you do not need to add them by hand.</p>
+    <div class="glopts">
+      ${O.accts.length?'<div class="eyebrow">Follow an account</div>'+O.accts.map(a=>opt('a|'+a,a,'Money in adds to the goal, money out comes off',cur.acct===a)).join(''):''}
+      ${O.keys.length?'<div class="eyebrow">Transfers we spotted</div>'+O.keys.map(x=>opt('k|'+x.k,x.nm,x.n+' transfers so far',cur.key===x.k)).join(''):''}
+      <div class="eyebrow">Or transfers that mention</div>
+      <label class="glopt"><input type="radio" name="glk" value="c" ${cur.key&&!O.keys.some(x=>x.k===cur.key)?'checked':''}><div style="flex:1"><input class="inp" id="glKey" maxlength="40" placeholder="goal saver, holiday" value="${cur.key&&!O.keys.some(x=>x.k===cur.key)?esc(cur.key):''}" style="width:100%;height:32px"></div></label>
+    </div>
+    ${O.accts.length||O.keys.length?'':'<div class="recnote">Import a bank statement and your accounts and savings transfers will show up here to pick from.</div>'}
+    <label class="field">Count from<select class="inp" id="glSince"><option value="today">Today on</option><option value="all" ${g.link&&!g.link.since?'selected':''}>Include past transfers too</option></select></label>
+    <div class="muted" id="glPrev" style="font-size:12.5px;min-height:18px"></div>
+    <div class="autherr" id="glErr"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" type="submit">${ic('check',16,2)}${g.link?'Save link':'Link goal'}</button>${g.link?'<button class="btn sec" type="button" data-act="glOff">Unlink</button>':''}</div>
+  </form>`;
+  $('#authModal').classList.add('open');glPreview();
+}
+function glPick(){const r=document.querySelector('input[name=glk]:checked');if(!r)return null;const v=r.value;if(v==='c'){const k=normNote($('#glKey').value||'');return k?{key:k}:null}return v[0]==='a'?{acct:v.slice(2)}:{key:v.slice(2)}}
+function glPreview(){const el=$('#glPrev');if(!el||!GL)return;const L=glPick();if(!L){el.textContent='';return}
+  const g=S.goals.find(x=>x.id===GL.id),skip=new Set();LINKED.forEach((gid,id)=>{if(gid===GL.id)return;skip.add(id);const t=S.txns.find(x=>x.id===id);if(t&&t.pair)skip.add(t.pair)}),all=linkScan(L,null,skip);
+  el.textContent=$('#glSince').value==='all'?(all.n?all.n+' past transaction'+(all.n===1?'':'s')+', '+money(all.sum)+' will be added. Only include these if they are not already in the '+money(g.saved-(g.lsum||0))+' saved.':'Nothing found yet. New ones will count as they come in.'):(all.n?all.n+' past transaction'+(all.n===1?'':'s')+' ('+money(all.sum)+') will be left out. Only new ones count.':'New ones will count as they come in.');
+}
 function contribute(id,amt,el){
   const g=S.goals.find(x=>x.id===id);if(!g||!(amt>0))return;
-  g.saved=Math.round((g.saved+amt)*100)/100;if(g.from)g.extra=Math.round(((+g.extra||0)+amt)*100)/100;S.txns.push({id:uid(),date:iso(new Date()),type:'expense',amount:Math.round(amt*100)/100,cat:'Savings',note:g.name,goal:g.id});const after=g.saved/g.target;g.hit=g.hit||{};
-  const [x,y]=centerOf(el);let milestone=false;
-  for(const m of [25,50,75,100]){if(after*100>=m&&!g.hit[m]){g.hit[m]=1;milestone=true;
-    if(m===100){notify('Goal reached: '+g.name,money(g.target)+' fully funded','win');showAch({kind:'goal',title:g.name,sub:money(g.target)+' fully funded. Well done.',icon:g.icon,xp:0})}
-    else{notify(g.name+' is '+m+'% funded',money(g.saved)+' of '+money(g.target),'good','goalstep');toast(g.name+' is '+m+'% funded',money(g.saved)+' of '+money(g.target),'good')}}}
+  g.saved=Math.round((g.saved+amt)*100)/100;if(g.from)g.extra=Math.round(((+g.extra||0)+amt)*100)/100;S.txns.push({id:uid(),date:iso(new Date()),type:'expense',amount:Math.round(amt*100)/100,cat:'Savings',note:g.name,goal:g.id});
+  const [x,y]=centerOf(el);const milestone=goalMilestones(g);
   confetti(x,y,{n:milestone?90:28,power:milestone?1:.6,colors:[g.color,'#d39a2c','#0d1117','#c9ced6']});
   if(!milestone)toast('Added to '+g.name,'+'+money(amt)+', now '+money(g.saved)+'. Logged under Savings','good');
   gainXP(3);completeMission('goal',el);commit();
@@ -2933,6 +2993,8 @@ document.addEventListener('click',e=>{
   else if(a==='bell'){const p=$('#npanel');p.classList.toggle('open');if(p.classList.contains('open')){renderNotifs();if(S.notifs.some(n=>!n.read)){S.notifs.forEach(n=>n.read=true);save();$('#bellBtn').innerHTML=ic('bell',18)}}}
   else if(a==='readAll'){S.notifs.forEach(n=>n.read=true);save();renderTop()}
   else if(a==='delTx'){if(locked(S.txns,el.dataset.id))return;delTx(el.dataset.id);save();render(true);toast('Transaction deleted','','info')}
+  else if(a==='glOpen'){glOpen(el.dataset.id)}
+  else if(a==='glOff'){const g=GL&&S.goals.find(x=>x.id===GL.id);if(g){delete g.link;delete g.lsum;delete g.lcount}$('#authModal').classList.remove('open');save();render(true);if(g)toast(g.name+' unlinked','What it counted so far stays on the goal','info')}
   else if(a==='contrib'){const amt=el.dataset.amt?+el.dataset.amt:parseFloat(($('#c_'+el.dataset.id)||{}).value);contribute(el.dataset.id,amt,el)}
   else if(a==='delGoal'){if(locked(S.goals,el.dataset.id))return;if(el.dataset.armed){S.goals=S.goals.filter(g=>g.id!==el.dataset.id);save();render()}else{el.dataset.armed=1;el.style.width='auto';el.style.padding='0 8px';el.style.color='var(--neg)';el.textContent='Delete?';setTimeout(()=>{if(el.isConnected){delete el.dataset.armed;el.removeAttribute('style');el.innerHTML=ic('x',14)}},3000)}}
   else if(a==='export'){
@@ -2945,7 +3007,8 @@ document.addEventListener('click',e=>{
   else if(a==='clear'){if(el.dataset.armed){S=Object.assign(fresh(),{syncUid:S.syncUid,syncAt:S.syncAt});S.flags.welcomed=true;S.flags.since=Date.now();save();render();toast('All data cleared','Add your first transaction to begin','info')}else{el.dataset.armed=1;el.querySelector('span').textContent='Click again to confirm';setTimeout(()=>{if(el.isConnected){delete el.dataset.armed;el.querySelector('span').textContent='Clear all data'}},4000)}}
 });
 document.addEventListener('input',e=>{const t=e.target;
-  if(t.id==='fq'){F.q=t.value;renderTxList()}
+  if(t.id==='glKey'){const r=document.querySelector('input[name=glk][value=c]');if(r)r.checked=true;glPreview()}
+  else if(t.id==='fq'){F.q=t.value;renderTxList()}
   else if(t.id==='wAmt'){$('#wConv').innerHTML=convText(parseAmt(t.value),W.f)}
   else if(t.id==='iAmt'){$('#iConv').innerHTML=convText(parseAmt(t.value),IM.f)}
   else if(t.dataset.p){P[t.dataset.p]=parseFloat(t.value)||0;renderProjection();if(!S.flags.planned){S.flags.planned=true;evalChallenges();save();renderTop()}}
@@ -2968,6 +3031,7 @@ document.addEventListener('change',e=>{const t=e.target;
   else if(t.dataset.shsel){const w=t.closest('.shfield'),b=w&&w.querySelector('.shsplit');if(b)b.hidden=!t.value}
   else if(t.dataset.shsplit){const w=t.closest('.shsplit'),b=w&&w.querySelector('.shpct');if(b)b.hidden=t.value!=='custom'}
   else if(t.id==='sMyName'){S.settings.myName=t.value.trim().slice(0,24);save();toast('Name saved','Shared entries show as from '+myName(),'good')}
+  else if(t.name==='glk'||t.id==='glSince'){glPreview()}
   else if(t.id==='sNotif'){S.settings.notifLevel=t.value;if(t.value!=='all'){S.notifs=S.notifs.filter(n=>!NOTIF_EXTRA[n.cat])}save();$('#remindCard').innerHTML=remindCard();renderTop()}
   else if(t.id==='sRemind'){S.settings.remind=+t.value;checkBills(true);save();toast(+t.value?'Bill reminders on':'Bill reminders off',+t.value?'You will be reminded '+t.selectedOptions[0].text.toLowerCase():'Turn them back on any time here','info')}
   else if(t.id==='bankFile'&&t.files.length){const fs=[...t.files];t.value='';importBankFiles(fs)}
@@ -2983,6 +3047,9 @@ document.addEventListener('submit',e=>{
   if(e.target.id==='itemForm'){e.preventDefault();const name=$('#iName').value.trim(),cat=$('#iCat').value,amt=parseAmt($('#iAmt').value);if(!name||!(amt>0)){$('#iAmt').focus();return}
     const ex=IM.id&&S.items.find(x=>x.id===IM.id),shE=$('#iShare');let tgt=ex;if(ex){if(ex.name!==name||ex.cat!==cat)ex.key=null;Object.assign(ex,{name,cat,amt,freq:IM.f});delete ex.full}else{tgt={id:uid(),key:null,cat,name,amt,freq:IM.f};S.items.push(tgt)}if(shE)readShare('iShare','items',tgt);
     $('#itemModal').classList.remove('open');if(cat!=='Income')OPEN.add(cat);commit();toast('Budget item saved',name+': '+money(amt*FREQ[IM.f][1],2)+' a week','good');return}
+  if(e.target.id==='glForm'){e.preventDefault();const g=GL&&S.goals.find(x=>x.id===GL.id),L=glPick();if(!g)return;if(!L){$('#glErr').textContent='Pick an account or a transfer, or type what the transfers mention';return}
+    const before=g.saved;g.link=Object.assign(L,$('#glSince').value==='all'?{}:{since:iso(new Date())});$('#authModal').classList.remove('open');syncGoalLinks();const d=Math.round((g.saved-before)*100)/100;
+    toast(g.name+' linked','Follows '+linkLabel(g.link)+(d?'. '+(d>0?'+':'-')+money(Math.abs(d))+' counted':''),'good');save();render(true);return}
   if(e.target.id!=='goalForm')return;e.preventDefault();
   const on=document.querySelector('#gIcon .on'),g={id:uid(),name:$('#gName').value.trim(),target:parseFloat($('#gTarget').value),saved:parseFloat($('#gSaved').value)||0,icon:on?on.dataset.i:'flag',color:GOAL_COLS[S.goals.length%GOAL_COLS.length],hit:{}};
   const gsh=$('#gShare');if(gsh&&gsh.value)g.sh=gsh.value;if(!g.name||!(g.target>0))return;[25,50,75,100].forEach(m=>{if(g.saved/g.target*100>=m)g.hit[m]=1});
