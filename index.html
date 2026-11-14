@@ -88,6 +88,7 @@ svg.i{flex:none;display:block}
 .swkeys{font-size:12px;text-align:center;margin-top:10px}.swdone{text-align:center;padding:12px 0}.swdone .cat{margin:0 auto 14px;border-radius:16px}.swdone h2{font-size:20px}.swdone p{font-size:13px;margin:6px 0 14px}.swdone .xpbig{display:inline-block;margin:0 0 16px;font-size:14px;font-weight:600;color:#9a6a10;background:#fcf3df;padding:6px 14px;border-radius:99px}
 .swdone .btn{display:flex;margin:0 auto;min-width:160px;justify-content:center}
 @media (max-width:560px){.swkeys{display:none}}
+.lrow.spot .btn.sm{flex:none}@media (max-width:560px){.lrow.spot{flex-wrap:wrap}.lrow.spot .grow{flex-basis:calc(100% - 50px)}.lrow.spot .btn.sm{margin-left:auto}.lrow.spot .btn.sm+.btn.sm{margin-left:0}}
 .rvlite{padding:8px 10px}.rvlite .btn.sm{flex:none}
 .rvfold{display:flex;align-items:center;gap:6px;width:100%;background:var(--line2);border:0;border-radius:10px;padding:9px 12px;margin:6px 0 8px;font:inherit;font-size:13px;color:var(--ink);cursor:pointer;text-align:left}.rvfold:hover{background:var(--line)}
 .rvf{position:sticky;bottom:-24px;background:var(--surface);padding:12px 0 0;margin-top:4px}
@@ -962,7 +963,7 @@ function nextDate(d,f,day){
 }
 function runRecurring(){
   const today=iso(new Date());let n=0;
-  (S.recurring||[]).forEach(r=>{let g=0;while(r.next<=today&&g<500){const rid='r-'+r.id+'-'+r.next;if(!S.txns.some(x=>x.id===rid))S.txns.push(Object.assign({id:rid,date:r.next,type:r.type,amount:r.amount,cat:r.cat,note:r.note,rec:r.id,auto:true},r.full!=null?{full:r.full,sp:'auto'}:{}));r.next=nextDate(r.next,r.freq,r.day);n++;g++}});
+  (S.recurring||[]).forEach(r=>{if(r.watch){const late=addDays(today,-5);let g=0;while(r.next<late&&g<500){r.next=nextDate(r.next,r.freq,r.day);g++}return}let g=0;while(r.next<=today&&g<500){const rid='r-'+r.id+'-'+r.next;if(!S.txns.some(x=>x.id===rid))S.txns.push(Object.assign({id:rid,date:r.next,type:r.type,amount:r.amount,cat:r.cat,note:r.note,rec:r.id,auto:true},r.full!=null?{full:r.full,sp:'auto'}:{}));r.next=nextDate(r.next,r.freq,r.day);n++;g++}});
   return n;
 }
 function recurringNotice(n,quiet){if(!n)return;const b='Repeating items were added on their due dates';notify(n+' repeating transaction'+(n>1?'s':'')+' logged',b,'info');if(!quiet)toast(n+' repeating transaction'+(n>1?'s':'')+' logged',b,'info')}
@@ -1366,11 +1367,69 @@ V.transactions=()=>`
     </div>
     <div id="txList"></div>
   </div>
-  ${recCard()}`;
+  ${spottedCard()}${recCard()}`;
+/* ============ Repeating bills spotted in your imports ============
+   Same merchant, a steady gap (weekly to yearly) and a steady amount means a bill. Tracked bills are not logged by
+   the app: your bank import brings each payment in, and the bill's next due date moves on when it lands. */
+const BANDS=[['weekly',7,1.5],['fortnightly',14,2],['monthly',30.4,4],['quarterly',91.3,10],['yearly',365,21]];
+const HALF={weekly:3,fortnightly:7,monthly:14,quarterly:30,yearly:60};
+const med=a=>{const b=[...a].sort((x,y)=>x-y),m=b.length>>1;return b.length%2?b[m]:(b[m-1]+b[m])/2};
+const NOTBILL=new Set(['Groceries','Dining']);
+function spotBills(){
+  const today=iso(new Date()),skip=new Set(S.settings.billSkip||[]),g=new Map(),out=[];
+  S.txns.forEach(t=>{if(t.src!=='bank'||t.type!=='expense'||t.goal||t.from||t.pair||t.rec)return;const k=merchKey(t.note);if(!k||skip.has(k))return;if(!g.has(k))g.set(k,[]);g.get(k).push(t)});
+  for(const [k,l] of g){
+    if((S.recurring||[]).some(r=>r.mkey===k))continue;
+    const dates=[...new Set(l.map(t=>t.date))].sort();if(dates.length<2||l.length>dates.length*1.25)continue;
+    const gaps=dates.slice(1).map((d,i)=>dayGap(d,dates[i])),m=med(gaps),band=BANDS.find(b=>Math.abs(m-b[1])<=b[2]);if(!band)continue;
+    const [freq,len,tol]=band;if(dates.length<(len>60?2:3))continue;
+    if(gaps.filter(x=>Math.abs(x-len)<=tol*1.5).length<gaps.length*.75)continue;
+    l.sort((a,b)=>a.date<b.date?-1:1);const last=l[l.length-1],cat=(c=>c)(l.map(t=>t.cat).sort((a,b)=>l.filter(t=>t.cat===b).length-l.filter(t=>t.cat===a).length)[0]);
+    if(NOTBILL.has(cat))continue;
+    const am=med(l.map(t=>t.amount)),slack=isBill(cat)?(cat==='Utilities'?.4:.15):.05;
+    if(l.filter(t=>Math.abs(t.amount-am)<=am*slack+.01).length<l.length*.75)continue;
+    if(addDays(last.date,Math.round(len*1.6))<today)continue; // stopped
+    const day=+last.date.slice(8);let next=nextDate(last.date,freq,day),gd=0;while(next<addDays(today,-5)&&gd<60){next=nextDate(next,freq,day);gd++}
+    const b={k,name:merchName(last.note)||titleCase(k),cat,amount:Math.round(last.amount*100)/100,freq,day,next,n:dates.length,fixed:slack<.2};
+    // Already a repeating item that logs itself? Then the import brings it in a second time
+    const nm=b.name.toLowerCase();b.twin=(S.recurring||[]).find(r=>{if(r.watch||r.type!=='expense'||r.freq!==freq)return false;const rn=String(r.note||'').toLowerCase(),same=rn&&(rn===nm||simDesc(r.note,last.note)>=.5||simDesc(r.note,b.name)>=.5);return same&&Math.abs(r.amount-am)<=am*.25+.01});
+    out.push(b);
+  }
+  return out.sort((a,b)=>(b.twin?1:0)-(a.twin?1:0)||weekly({amt:b.amount,freq:b.freq})-weekly({amt:a.amount,freq:a.freq}));
+}
+/* Link imported payments to their tracked bill, keep the latest amount and move the due date on */
+function syncWatch(){
+  let n=0;(S.recurring||[]).forEach(r=>{if(!r.watch||!r.mkey)return;
+    const l=S.txns.filter(t=>t.src==='bank'&&t.type==='expense'&&!t.pair&&merchKey(t.note)===r.mkey).sort((a,b)=>a.date<b.date?-1:1);if(!l.length)return;
+    l.forEach(t=>{if(!t.rec){t.rec=r.id;n++}});const last=l[l.length-1];
+    if(!r.seen||last.date>r.seen){r.seen=last.date;r.amount=last.amount;let g=0;while(r.next<=addDays(last.date,HALF[r.freq]||14)&&g<60){r.next=nextDate(r.next,r.freq,r.day);g++}}});
+  return n;
+}
+function trackBill(b,addBud){
+  const r={id:uid(),type:'expense',amount:b.amount,cat:b.cat,note:b.name,freq:b.freq,day:b.day,next:b.next,watch:1,mkey:b.k};S.recurring.push(r);
+  let bud='';if(addBud&&!S.items.some(it=>it.cat===b.cat)){S.items.push({id:uid(),key:null,cat:b.cat,name:b.name,amt:b.amount,freq:b.freq});bud='added to your budget'}
+  syncWatch();return bud;
+}
+function fixTwin(b){
+  const r=b.twin;r.watch=1;r.mkey=b.k;r.amount=b.amount;r.day=b.day;r.next=b.next;
+  const bank=S.txns.filter(t=>t.src==='bank'&&t.type==='expense'&&merchKey(t.note)===b.k);let gone=0;
+  S.txns=S.txns.filter(t=>{if(!(t.auto&&t.rec===r.id))return true;const dup=bank.some(x=>dayGap(x.date,t.date)<=(HALF[r.freq]||7)&&Math.abs(x.amount-t.amount)<=t.amount*.2+.01);if(dup)gone++;return !dup});
+  syncWatch();return gone;
+}
+let SPOT=null;
+function spottedCard(){
+  SPOT=spotBills();if(!SPOT.length)return '';const FL={weekly:'week',fortnightly:'fortnight',monthly:'month',quarterly:'quarter',yearly:'year'};
+  const show=SPOT.slice(0,6);
+  return `<div class="card" style="margin-top:16px"><div class="ch"><div><h3>Repeating bills we spotted</h3><div class="s" style="margin-top:2px">Found in your bank imports. Track one and it shows in Bills coming up, with the due date moving on each time the payment comes in.</div></div></div>
+  ${show.map((b,i)=>{const ci=CATS[b.cat]||CATS.Other,noBud=!S.items.some(it=>it.cat===b.cat);
+    if(b.twin)return `<div class="lrow spot">${catChip(ci)}<div class="grow"><div class="nm">${esc(b.name)}</div><div class="sb">${esc(b.twin.note||b.twin.cat)} logs itself every ${FL[b.freq]} and your imports bring it in too, so it may be counted twice</div></div><button class="btn pri sm" data-act="spotFix" data-i="${i}">Fix it</button><button class="btn sec sm" data-act="spotNo" data-i="${i}">Leave it</button></div>`;
+    return `<div class="lrow spot">${catChip(ci)}<div class="grow"><div class="nm">${esc(b.name)}</div><div class="sb">Every ${FL[b.freq]} · ${b.fixed?'':'about '}${money(b.amount,2)} · ${esc(b.cat)} · seen ${b.n} times · next ${dLabel(b.next)}${noBud?' · will be added to your budget':''}</div></div><button class="btn pri sm" data-act="spotAdd" data-i="${i}">Track</button><button class="btn sec sm" data-act="spotNo" data-i="${i}">Not a bill</button></div>`}).join('')}
+  ${SPOT.length>show.length?`<div class="muted" style="font-size:12.5px;margin-top:10px">${SPOT.length-show.length} more once you sort these</div>`:''}</div>`;
+}
 function recCard(){
   const R=[...(S.recurring||[])].sort((a,b)=>a.next.localeCompare(b.next)),FL={weekly:'week',fortnightly:'fortnight',monthly:'month',quarterly:'quarter',yearly:'year'};
-  return `<div class="card" style="margin-top:16px"><div class="ch"><div><h3>Recurring</h3><div class="s" style="margin-top:2px">Logged for you on each due date</div></div><button class="btn sec sm" data-act="recNew">${ic('plus',14,2)}Add repeating item</button></div>
-  ${R.length?R.map(r=>{const ci=r.type==='transfer'?XFER:r.type==='income'?(INCATS[r.cat]||INCATS['Other income']):(CATS[r.cat]||CATS.Other);return `<div class="lrow">${catChip(ci)}<div class="grow"><div class="nm">${esc(r.note||r.cat)}</div><div class="sb">Every ${FL[r.freq]} · next on ${dLabel(r.next)}${shTag('recurring',r)}</div></div><span class="amt ${r.type==='income'?'in':''}">${r.type==='income'?'+':r.type==='transfer'?'':'-'}${money(r.amount,2)}</span>${BOARD&&r.from?lockBtn(r):`<button class="del" style="opacity:1" data-act="recEdit" data-id="${r.id}" aria-label="Edit">${ic('edit',14)}</button><button class="del" style="opacity:1" data-act="recDel" data-id="${r.id}" aria-label="Stop repeating">${ic('trash',14)}</button>`}</div>`}).join(''):empty('repeat','Nothing repeating yet. Choose how often it repeats when you add rent, pay or a subscription.')}
+  return `<div class="card" style="margin-top:16px"><div class="ch"><div><h3>Recurring</h3><div class="s" style="margin-top:2px">Logged for you on each due date, or tracked from your bank imports</div></div><button class="btn sec sm" data-act="recNew">${ic('plus',14,2)}Add repeating item</button></div>
+  ${R.length?R.map(r=>{const ci=r.type==='transfer'?XFER:r.type==='income'?(INCATS[r.cat]||INCATS['Other income']):(CATS[r.cat]||CATS.Other);return `<div class="lrow">${catChip(ci)}<div class="grow"><div class="nm">${esc(r.note||r.cat)}</div><div class="sb">Every ${FL[r.freq]} · next on ${dLabel(r.next)}${r.watch?' · tracked from imports':''}${shTag('recurring',r)}</div></div><span class="amt ${r.type==='income'?'in':''}">${r.type==='income'?'+':r.type==='transfer'?'':'-'}${money(r.amount,2)}</span>${BOARD&&r.from?lockBtn(r):`<button class="del" style="opacity:1" data-act="recEdit" data-id="${r.id}" aria-label="Edit">${ic('edit',14)}</button><button class="del" style="opacity:1" data-act="recDel" data-id="${r.id}" aria-label="Stop repeating">${ic('trash',14)}</button>`}</div>`}).join(''):empty('repeat','Nothing repeating yet. Choose how often it repeats when you add rent, pay or a subscription.')}
   </div>`;
 }
 function renderTxList(){
@@ -2169,8 +2228,9 @@ function rvCommit(){
   const take=R.staged.filter(t=>!t.dupOf||t.keep);
   take.forEach(t=>{['ruled','fi','dupOf','dupNote','dupDate','dupAcct','keep'].forEach(k=>delete t[k]);S.txns.push(t)});
   $('#reviewModal').classList.remove('open');RV=null;
+  syncWatch();const spot=spotBills().length;
   const n=take.length;
-  toast(n+' transaction'+(n>1?'s':'')+' imported',[xf?xf+' transfer'+(xf>1?'s':'')+' matched':'',rules?rules+' rule'+(rules>1?'s':'')+' saved':'',touched?touched+' older transaction'+(touched>1?'s':'')+' updated':'',renamed?renamed+' older transaction'+(renamed>1?'s':'')+' moved to the right account':''].filter(Boolean).join(', ')||'Categories are set, tweak any of them in Transactions','good');
+  toast(n+' transaction'+(n>1?'s':'')+' imported',[xf?xf+' transfer'+(xf>1?'s':'')+' matched':'',rules?rules+' rule'+(rules>1?'s':'')+' saved':'',touched?touched+' older transaction'+(touched>1?'s':'')+' updated':'',renamed?renamed+' older transaction'+(renamed>1?'s':'')+' moved to the right account':'',spot?spot+' repeating bill'+(spot>1?'s':'')+' spotted, see Transactions':''].filter(Boolean).join(', ')||'Categories are set, tweak any of them in Transactions','good');
   commit();
   if(unknownList().length)setTimeout(()=>sorterOpen(),600);
 }
@@ -2812,9 +2872,14 @@ document.addEventListener('click',e=>{
     toast('Phone alerts on',closed?'You will get bill alerts even when the app is closed':'You will get a pop-up when a bill is close','good');sysNotify('Phone alerts are on','Bill reminders will show up like this','test')});return}
   if(a==='alertsOff'){S.settings.phoneAlerts=false;save();pushUnsubscribe().then(()=>{$('#remindCard').innerHTML=remindCard()});return}
   if(a==='alertsTest'){if(pushOn()&&SB.client){el.disabled=true;SB.client.functions.invoke('bill-reminders',{body:{test:true}}).then(({data,error})=>{el.disabled=false;if(error||!data||!data.sent)toast('Test did not go through','Turn alerts off and on again, then retry','warn');else toast('Test sent','It can take a few seconds to arrive','good')})}else sysNotify('Test alert','Bill reminders will show up like this','test');return}
+  if(a==='spotAdd'||a==='spotFix'||a==='spotNo'){const b=SPOT&&SPOT[+el.dataset.i];if(!b)return;
+    if(a==='spotNo'){S.settings.billSkip=[...(S.settings.billSkip||[]),b.k].slice(-200);if(b.twin)toast('Left as it is',b.name+' will not be suggested again','info');else toast('Not a bill',b.name+' will not be suggested again','info')}
+    else if(a==='spotAdd'){const bud=trackBill(b,true);toast('Tracking '+b.name,'Next due '+dLabel(b.next)+(bud?', '+bud:''),'good')}
+    else{const n=fixTwin(b);toast(b.name+' now tracked from imports',n?n+' doubled-up transaction'+(n===1?'':'s')+' removed':'It will no longer log itself','good')}
+    commit();return}
   if(a==='recNew'){openModal('new');$('#fRepeat').value='monthly';return}
   if(a==='recEdit'){if(locked(S.recurring,el.dataset.id))return;openModal('rule',el.dataset.id);return}
-  if(a==='recDel'){if(locked(S.recurring,el.dataset.id))return;const r=S.recurring.find(x=>x.id===el.dataset.id);S.recurring=S.recurring.filter(x=>x.id!==el.dataset.id);save();render(true);if(r)toast('Stopped repeating '+(r.note||r.cat),'Past transactions are kept','info');return}
+  if(a==='recDel'){if(locked(S.recurring,el.dataset.id))return;const r=S.recurring.find(x=>x.id===el.dataset.id);if(r&&r.mkey)S.settings.billSkip=[...(S.settings.billSkip||[]),r.mkey].slice(-200);S.recurring=S.recurring.filter(x=>x.id!==el.dataset.id);save();render(true);if(r)toast('Stopped repeating '+(r.note||r.cat),'Past transactions are kept','info');return}
   if(a==='fDel'){$('#modal').classList.remove('open');if(MM.mode==='rule'){const r=S.recurring.find(x=>x.id===MM.id);S.recurring=S.recurring.filter(x=>x.id!==MM.id);save();render(true);if(r)toast('Stopped repeating '+(r.note||r.cat),'Past transactions are kept','info')}else{delTx(MM.id);save();render(true);toast('Transaction deleted','','info')}return}
   if(a==='achClose'){closeAch();return}
   if(a==='mission'){const m=MISSIONS.find(x=>x.id===el.dataset.id);if(m.act==='add')openModal();else{S.view=m.view;if(m.id==='budget')completeMission('budget',el);save();render();scrollTo({top:0})}return}
