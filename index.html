@@ -888,8 +888,13 @@ function monthTx(ym){return S.txns.filter(t=>t.date.slice(0,7)===ym)}
 const isSave = c => (CATS[c]||{}).k==='save';
 function totals(ym){let inc=0,exp=0,sav=0;const byCat={};for(const t of monthTx(ym)){if(t.type==='income')inc+=t.amount;else if(t.type==='expense'){byCat[t.cat]=(byCat[t.cat]||0)+t.amount;if(isSave(t.cat))sav+=t.amount;else exp+=t.amount}}return {inc,exp,sav,net:inc-exp,rate:inc?(inc-exp)/inc:0,byCat}}
 const manual = () => S.txns.filter(t=>!t.auto&&t.src!=='bank');
-function streak(){const days=new Set(manual().map(t=>t.date));const d=new Date();if(!days.has(iso(d)))d.setDate(d.getDate()-1);let n=0;while(days.has(iso(d))){n++;d.setDate(d.getDate()-1)}return n}
-function daysLogged(ym){return new Set(monthTx(ym).filter(t=>!t.auto&&t.src!=='bank').map(t=>t.date)).size}
+/* Days you looked after your money: a transaction you logged yourself, or a day you imported a statement or sorted
+   transactions. Imports count on the day you do them, not on the dates inside the statement, so a three month file
+   is one day of effort, not a ninety day streak. */
+function markActive(){const d=iso(new Date()),a=S.flags.act=(S.flags.act||[]).filter(x=>x!==d);a.push(d);S.flags.act=a.slice(-120)}
+function activeDays(){return new Set([...manual().map(t=>t.date),...(S.flags.act||[])])}
+function streak(){const days=activeDays();const d=new Date();if(!days.has(iso(d)))d.setDate(d.getDate()-1);let n=0;while(days.has(iso(d))){n++;d.setDate(d.getDate()-1)}return n}
+function daysLogged(ym){return [...activeDays()].filter(d=>d.slice(0,7)===ym).length}
 const weekly = it => (+it.amt||0)*((FREQ[it.freq]||FREQ.monthly)[1]);
 function budgetsW(){const o={};S.items.forEach(it=>{if(it.cat!=='Income')o[it.cat]=(o[it.cat]||0)+weekly(it)});return o}
 function BM(){const o={},w=budgetsW();for(const c in w)o[c]=w[c]*52/12;return o}
@@ -984,9 +989,9 @@ function findRule(note){let best=null;(S.rules||[]).forEach(r=>{if(matchKey(note
 /* ============ Challenges ============ */
 const CHALLENGES = [
   {id:'first',icon:'leaf',name:'First steps',desc:'Log your first transaction',xp:50,prog:()=>Math.min(S.txns.length,1)},
-  {id:'week',icon:'calendar',name:'Week warrior',desc:'Log something on 7 different days this month',xp:100,prog:()=>daysLogged(curYM())/7},
-  {id:'streak',icon:'flame',name:'On a roll',desc:'Reach a 5 day logging streak',xp:120,prog:()=>streak()/5},
-  {id:'streak14',icon:'zap',name:'Unstoppable',desc:'Reach a 14 day logging streak',xp:300,prog:()=>streak()/14},
+  {id:'week',icon:'calendar',name:'Week warrior',desc:'Log, import or sort on 7 different days this month',xp:100,prog:()=>daysLogged(curYM())/7},
+  {id:'streak',icon:'flame',name:'On a roll',desc:'Reach a 5 day streak',xp:120,prog:()=>streak()/5},
+  {id:'streak14',icon:'zap',name:'Unstoppable',desc:'Reach a 14 day streak',xp:300,prog:()=>streak()/14},
   {id:'saver20',icon:'percent',name:'The 20% club',desc:'Save 20% or more of a full month\'s income',xp:200,prog:()=>{const l=totals(shiftYM(curYM(),-1));if(l.inc&&l.rate>=0.2)return 1;const t=totals(curYM());return t.inc?Math.min(.99,t.rate/0.2):0}},
   {id:'chef',icon:'utensils',name:'Home cook',desc:'Reach the 20th with Dining under 60% of budget',xp:150,prog:()=>{
     const b=BM().Dining||0;if(!b)return 0;const sp=totals(curYM()).byCat.Dining||0,day=new Date().getDate(),ok=sp<=0.6*b;
@@ -1247,7 +1252,7 @@ V.dashboard=()=>{
   const WW=280,WH=110,bwid=24,wgap=(WW-7*bwid)/6,wmx=Math.max(wb/7*1.5,...wd,1),al=WH-(wb/7)/wmx*WH;
   const wbars=wd.map((v,i)=>{const x=i*(bwid+wgap),h=v/wmx*WH,fut=wdays[i]>todayIso,isT=wdays[i]===todayIso;return (fut?'<rect x="'+x+'" y="0" width="'+bwid+'" height="'+WH+'" rx="5" fill="#f5f6f8"/>':'')+'<rect class="growy" style="animation-delay:'+(i*.04)+'s" x="'+x+'" y="'+(WH-h)+'" width="'+bwid+'" height="'+h+'" rx="5" fill="'+(isT?'#0e7a5c':v>wb/7?'#e5aaa4':'#c9ced6')+'"><title>'+money(v,2)+'</title></rect><text x="'+(x+bwid/2)+'" y="'+(WH+16)+'" text-anchor="middle"'+(isT?' style="fill:#0d1117;font-weight:600"':'')+'>'+'MTWTFSS'[i]+'</text>'}).join('');
   const D=getDaily(),dn=MISSIONS.filter(m=>D.done[m.id]).length,hr=new Date().getHours(),greet=hr<12?'Good morning':hr<17?'Good afternoon':'Good evening';
-  const logged=new Set(manual().map(x=>x.date)),last7=[...Array(7)].map((_,i)=>{const d=new Date();d.setDate(d.getDate()-6+i);return d});
+  const logged=activeDays(),last7=[...Array(7)].map((_,i)=>{const d=new Date();d.setDate(d.getDate()-6+i);return d});
   const safe=wb-wTot,stk=streak();
   const player=`<div class="player">
     <div><div class="lab">${greet}. ${wb?'Safe to spend this week':'Net saved this month'}</div><div class="safe">${wb?count(Math.max(safe,0)):count(t.net)}</div>
@@ -1600,7 +1605,7 @@ V.settings=()=>`
     </div>
     <div class="card"><div class="ch"><h3>Install on your phone</h3></div>${installCard()}</div>
     <div class="card"><div class="ch"><h3>How progress works</h3></div>
-      <p class="muted" style="font-size:13px">Each transaction you log earns 5 XP and badges pay larger rewards. Every ${LEVEL_XP} XP takes you up a level. Repeating transactions and bank imports are added for you, so they do not count toward your streak. Budget alerts trigger at 80% and 100% of each limit, and goal alerts at 25, 50, 75 and 100%. Press <b style="color:var(--ink)">N</b> anywhere to add a transaction.</p>
+      <p class="muted" style="font-size:13px">Each transaction you log earns 5 XP and badges pay larger rewards. Every ${LEVEL_XP} XP takes you up a level. Your streak counts each day you log a transaction, import a bank statement or sort transactions. An import counts once, on the day you do it, however many days the statement covers. Repeating items the app logs for you do not count. Budget alerts trigger at 80% and 100% of each limit, and goal alerts at 25, 50, 75 and 100%. Press <b style="color:var(--ink)">N</b> anywhere to add a transaction.</p>
     </div>
   </div>`;
 
@@ -2230,7 +2235,7 @@ function rvCommit(){
   const take=R.staged.filter(t=>!t.dupOf||t.keep);
   take.forEach(t=>{['ruled','fi','dupOf','dupNote','dupDate','dupAcct','keep'].forEach(k=>delete t[k]);S.txns.push(t)});
   $('#reviewModal').classList.remove('open');RV=null;
-  syncWatch();const spot=spotBills().length;
+  syncWatch();markActive();const spot=spotBills().length;
   const n=take.length;
   toast(n+' transaction'+(n>1?'s':'')+' imported',[xf?xf+' transfer'+(xf>1?'s':'')+' matched':'',rules?rules+' rule'+(rules>1?'s':'')+' saved':'',touched?touched+' older transaction'+(touched>1?'s':'')+' updated':'',renamed?renamed+' older transaction'+(renamed>1?'s':'')+' moved to the right account':'',spot?spot+' repeating bill'+(spot>1?'s':'')+' spotted, see Transactions':''].filter(Boolean).join(', ')||'Categories are set, tweak any of them in Transactions','good');
   commit();
@@ -2818,7 +2823,7 @@ function soApply(choice){
 }
 function soNext(dir){const el=$('#swCard');SO.i++;if(el&&!reduce){el.style.transition='transform .25s ease,opacity .25s';el.style.transform=`translateX(${dir==='l'?-140:140}%) rotate(${dir==='l'?-12:12}deg)`;el.style.opacity='0';setTimeout(drawSorter,230)}else drawSorter()}
 function soAccept(){const c=SO.cards[SO.i];if(!c)return;soApply(c.sug?c.sug.cat:'__keep')}
-function soClose(){if(!SO)return;const n=SO.sorted;$('#sortModal').classList.remove('open');if(n){gainXP(n*2);toast('Sorted '+n+' merchant'+(n===1?'':'s'),SO.txs+' transactions placed. Future imports follow your choices','good')}SO=null;commit()}
+function soClose(){if(!SO)return;const n=SO.sorted;if(n)markActive();$('#sortModal').classList.remove('open');if(n){gainXP(n*2);toast('Sorted '+n+' merchant'+(n===1?'':'s'),SO.txs+' transactions placed. Future imports follow your choices','good')}SO=null;commit()}
 (()=>{let sx=0,dx=0,drag=false;const box=()=>$('#sortBox');
   document.addEventListener('pointerdown',e=>{const c=e.target.closest&&e.target.closest('#swCard');if(!c||!SO)return;drag=true;sx=e.clientX;dx=0;c.setPointerCapture(e.pointerId);c.style.transition='none'});
   document.addEventListener('pointermove',e=>{if(!drag)return;const c=$('#swCard');if(!c)return;dx=e.clientX-sx;c.style.transform=`translateX(${dx}px) rotate(${dx/18}deg)`;c.classList.toggle('gl',dx<-40);c.classList.toggle('gr',dx>40)});
