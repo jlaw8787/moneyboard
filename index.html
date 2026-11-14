@@ -516,6 +516,8 @@ button.pchip{cursor:pointer}
   .top .t{grid-area:t;min-width:0}.top #bellBtn{grid-area:bell}.top .ctl{grid-area:ctl;justify-self:start}
   #toasts{bottom:calc(78px + env(safe-area-inset-bottom));right:84px}.toast small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}}
 .lvcard[hidden],#shareCard[hidden]{display:none!important}
+.wrap{display:flex;align-items:center;gap:14px;margin-bottom:16px}.wrap .eb{font-size:11.5px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.04em}.wrap .nm{font-weight:600;color:var(--ink);font-size:14.5px;margin-top:2px}.wrap .sb{font-size:12.5px;color:var(--muted);margin-top:2px}.wrap.good{background:linear-gradient(135deg,#fffaf0,#fff);border-color:#f3e2bd}
+@media (max-width:560px){.wrap{flex-wrap:wrap}.wrap .grow{flex-basis:calc(100% - 60px)}.wrap .btn{margin-left:54px}}
 .planrow{margin-bottom:16px}.gadd{align-self:flex-start;margin-top:4px}.pl3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.pl3 .num{font-size:24px;margin-top:4px}.pl3 .muted{font-size:12px;margin-top:2px}@media (max-width:560px){.pl3 .num{font-size:19px}}
 .dgrid{align-items:start}.dgrid>.card{margin-bottom:0!important}.morecard .grow{flex:1}
 @media (max-width:900px){.player{grid-template-columns:1fr}.pside{flex-direction:row;border-left:0;padding-left:0;border-top:1px solid rgba(255,255,255,.1);padding-top:16px;gap:14px}.pchip{flex:1}.pchip .lvchip,.pchip .flame{width:36px;height:36px}.missions{grid-template-columns:repeat(3,minmax(0,1fr))}.missions .mt{grid-column:1/-1}.mis{flex-direction:column;align-items:flex-start;gap:8px;padding:10px}.mis .tx{white-space:normal;font-size:12.5px;line-height:1.3}}
@@ -1019,6 +1021,7 @@ function findRule(note){let best=null;(S.rules||[]).forEach(r=>{if(matchKey(note
 const CHALLENGES = [
   {id:'first',icon:'leaf',name:'First steps',desc:'Log your first transaction',xp:50,prog:()=>Math.min(S.txns.length,1)},
   {id:'week',icon:'calendar',name:'Week warrior',desc:'Log, import or sort on 7 different days this month',xp:100,prog:()=>daysLogged(curYM())/7},
+  {id:'steady',icon:'check',name:'Steady hand',desc:'Stay under your everyday budget 4 weeks in a row',xp:200,prog:()=>budStreak()/4},
   {id:'streak',icon:'flame',name:'On a roll',desc:'Reach a 5 day streak',xp:120,prog:()=>streak()/5},
   {id:'streak14',icon:'zap',name:'Unstoppable',desc:'Reach a 14 day streak',xp:300,prog:()=>streak()/14},
   {id:'saver20',icon:'percent',name:'The 20% club',desc:'Save 20% or more of a full month\'s income',xp:200,prog:()=>{const l=totals(shiftYM(curYM(),-1));if(l.inc&&l.rate>=0.2)return 1;const t=totals(curYM());return t.inc?Math.min(.99,t.rate/0.2):0}},
@@ -1041,15 +1044,29 @@ const XPC='linear-gradient(90deg,#f1c66b,#d39a2c)';
 const TIER={gold:['#f6d27a','#c8901e','#3a2706'],silver:['#eef1f5','#a3acba','#2b313b'],bronze:['#f2c6a0','#b8703f','#3d1f0a']};
 const tierOf=xp=>xp>=250?'gold':xp>=150?'silver':'bronze';
 const medalBg=t=>'background:linear-gradient(145deg,'+TIER[t][0]+','+TIER[t][1]+');color:'+TIER[t][2];
-const MISSIONS=[{id:'log',t:'Log a transaction',xp:10,act:'add'},{id:'budget',t:'Check your budget',xp:5,act:'nav',view:'budgets'},{id:'goal',t:'Add to a savings goal',xp:10,act:'nav',view:'goals'}];
+/* Daily missions: log is always on, plus two picked for the day from whatever makes sense for you right now */
+const MPOOL=[
+  {id:'log',t:'Log a transaction',xp:10,act:'add'},
+  {id:'budget',t:'Check your budget',xp:5,act:'nav',view:'budgets',visit:1},
+  {id:'goal',t:'Add to a savings goal',xp:10,act:'nav',view:'goals',ok:()=>S.goals.some(g=>!g.from&&g.saved<g.target)},
+  {id:'report',t:'Read your money report',xp:5,act:'nav',view:'report',visit:1,ok:()=>S.txns.length>0},
+  {id:'tx',t:'Look over your spending',xp:5,act:'nav',view:'transactions',visit:1,ok:()=>S.txns.length>0},
+  {id:'sort',t:'Sort an unknown transaction',xp:10,act:'sort',ok:()=>unknownList().length>0},
+  {id:'import',t:'Import a bank statement',xp:15,act:'nav',view:'transactions',ok:()=>S.txns.some(t=>t.src==='bank')},
+  {id:'badge',t:'See which badge is next',xp:5,act:'nav',view:'challenges',visit:1}];
+function missions(){const D=getDaily();
+  if(!D.ids){const pick=MPOOL.slice(1).filter(m=>!m.ok||m.ok());let h=2166136261;for(const c of D.date+(S.syncUid||'')){h^=c.charCodeAt(0);h=Math.imul(h,16777619)>>>0}const out=[];
+    while(out.length<2&&pick.length){h^=h>>>13;h=Math.imul(h,0x5bd1e995)>>>0;h^=h>>>15;out.push(pick.splice(h%pick.length,1)[0].id)}D.ids=['log',...out]}
+  return D.ids.map(id=>MPOOL.find(m=>m.id===id)).filter(Boolean)}
+function visitMission(v){const m=missions().find(x=>x.visit&&x.view===v);if(m)completeMission(m.id)}
 function gameReveal(){if(gameOn()&&!S.flags.game){S.flags.game=1;}}
 const gameOn=()=>!!(S.flags.setup||S.txns.length||S.xp||S.goals.length);
 function getDaily(){const d=iso(new Date());if(!S.daily||S.daily.date!==d)S.daily={date:d,done:{}};return S.daily}
 function completeMission(id,el){
-  const D=getDaily();if(D.done[id])return;D.done[id]=1;const m=MISSIONS.find(x=>x.id===id);
+  const D=getDaily(),M=missions();if(D.done[id]||!M.some(x=>x.id===id))return;D.done[id]=1;const m=M.find(x=>x.id===id);
   const before=level();S.xp+=m.xp;if(el&&el.offsetParent)floatAt(el,'+'+m.xp+' XP');
-  if(MISSIONS.every(x=>D.done[x.id])){S.xp+=25;notify('Perfect day','All three daily missions done. +25 bonus XP','win','xp');setTimeout(()=>showAch({kind:'day',title:'Perfect day',sub:'You completed every daily mission. Come back tomorrow for more.',xp:25+m.xp}),400)}
-  else if(id==='budget')toast('Mission complete: '+m.t,'+'+m.xp+' XP','win');
+  if(M.every(x=>D.done[x.id])){S.xp+=25;notify('Perfect day','All three daily missions done. +25 bonus XP','win','xp');setTimeout(()=>showAch({kind:'day',title:'Perfect day',sub:'You completed every daily mission. Come back tomorrow for more.',xp:25+m.xp}),400)}
+  else if(m.visit)toast('Mission complete: '+m.t,'+'+m.xp+' XP','win');
   checkLevel(before);save();
 }
 let ACHQ=[];
@@ -1304,7 +1321,7 @@ function dashParts(){
   const wd=wdays.map(d=>S.txns.filter(x=>x.type==='expense'&&evCats.has(x.cat)&&x.date===d).reduce((a,x)=>a+x.amount,0));
   const WW=280,WH=110,bwid=24,wgap=(WW-7*bwid)/6,wmx=Math.max(wb/7*1.5,...wd,1),al=WH-(wb/7)/wmx*WH;
   const wbars=wd.map((v,i)=>{const x=i*(bwid+wgap),h=v/wmx*WH,fut=wdays[i]>todayIso,isT=wdays[i]===todayIso;return (fut?'<rect x="'+x+'" y="0" width="'+bwid+'" height="'+WH+'" rx="5" fill="#f5f6f8"/>':'')+'<rect class="growy" style="animation-delay:'+(i*.04)+'s" x="'+x+'" y="'+(WH-h)+'" width="'+bwid+'" height="'+h+'" rx="5" fill="'+(isT?'#0e7a5c':v>wb/7?'#e5aaa4':'#c9ced6')+'"><title>'+money(v,2)+'</title></rect><text x="'+(x+bwid/2)+'" y="'+(WH+16)+'" text-anchor="middle"'+(isT?' style="fill:#0d1117;font-weight:600"':'')+'>'+'MTWTFSS'[i]+'</text>'}).join('');
-  const D=getDaily(),dn=MISSIONS.filter(m=>D.done[m.id]).length,hr=new Date().getHours(),greet=hr<12?'Good morning':hr<17?'Good afternoon':'Good evening';
+  const D=getDaily(),MS=missions(),dn=MS.filter(m=>D.done[m.id]).length,hr=new Date().getHours(),greet=hr<12?'Good morning':hr<17?'Good afternoon':'Good evening';
   const logged=activeDays(),last7=[...Array(7)].map((_,i)=>{const d=new Date();d.setDate(d.getDate()-6+i);return d});
   const safe=wb-wTot,stk=streak();
   const player=`<div class="player">
@@ -1316,7 +1333,7 @@ function dashParts(){
       <button class="pchip" data-act="nav" data-view="challenges"><span class="lvchip">${l}</span><div class="grow"><b>${levelTitle(l)}</b><div class="pbar"><i data-w="${(into/LEVEL_XP*100).toFixed(1)}"></i></div><small>${LEVEL_XP-into} XP to level ${l+1}</small></div></button>
       <div class="pchip"><span class="flame">${ic('flame',28,1.8)}</span><div class="grow"><b>${stk} day streak</b><small>${logged.has(todayIso)?'Done for today':stk?'Log or import today to keep it':'Log something today to start'}</small></div></div>
     </div>
-    <div class="missions"><div class="mt"><b>Today</b>${dn} of ${MISSIONS.length} done</div>${MISSIONS.map(m=>`<button class="mis ${D.done[m.id]?'done':''}" data-act="mission" data-id="${m.id}"><span class="ck">${D.done[m.id]?ic('check',13,2.6):''}</span><span class="tx">${m.t}</span><span class="px">+${m.xp}</span></button>`).join('')}</div>`:''}
+    <div class="missions"><div class="mt"><b>Today</b>${dn} of ${MS.length} done</div>${MS.map(m=>`<button class="mis ${D.done[m.id]?'done':''}" data-act="mission" data-id="${m.id}"><span class="ck">${D.done[m.id]?ic('check',13,2.6):''}</span><span class="tx">${m.t}</span><span class="px">+${m.xp}</span></button>`).join('')}</div>`:''}
   </div>`;
   const P={player,pace:`<div class="card chart"><div class="ch"><h3>Spending pace</h3><span class="s">${lastDay&&tbE?(diff>0?'<span class="neg">'+money(diff)+' ahead of budget pace</span>':'<span class="pos">'+money(Math.abs(diff))+' under budget pace</span>'):'No data yet'}</span></div>
       <svg viewBox="0 -8 ${W} ${Hh+32}">
@@ -1351,7 +1368,7 @@ V.dashboard=()=>{
   const P=dashParts();
   if(!S.txns.length)return `${backupBanner()}${gsCard()}${P.player}${S.recurring.length?billsCard():''}
   <div class="card quiet"><div style="display:flex;justify-content:center">${catChip({i:'trend',c:'#0e7a5c'},44)}</div><h3 style="margin-top:12px">Your charts start here</h3><p class="muted">Add or import a few transactions and this fills up with your week, your bills and your budgets.</p></div>`;
-  return `${backupBanner()}${gsCard()}${P.player}${reportNudge()}
+  return `${backupBanner()}${gsCard()}${P.player}${weekWrap()}${reportNudge()}
   <div class="grid c2 dgrid">${P.week}${P.bud}</div>
   <div class="grid c2 dgrid">${billsCard()}${P.recent}</div>
   <button class="card morecard" data-act="nav" data-view="report">${catChip({i:'book',c:'#0e7a5c'},36)}<div class="grow"><div class="nm">Want the full picture?</div><div class="sb">Spending pace, insights, trends and your money health score are in Report</div></div>${ic('chevR',18)}</button>`;
@@ -1678,6 +1695,16 @@ function reportText(ym){
   reportPoints(R).forEach(p=>lines.push('- '+plain(p[2])));
   const tc=R.cats.filter(c=>c.a>0).slice(0,5);if(tc.length){lines.push('','Top categories:');tc.forEach(c=>lines.push('- '+c.c+': '+money(c.a)))}
   return lines.join('\n');
+}
+/* Weekly wrap: on Sunday for the week so far, Monday and Tuesday for the week just gone */
+function weekR(k){const m=mondayOf(new Date());m.setDate(m.getDate()-7*k);const e=new Date(m);e.setDate(e.getDate()+6);return {a:iso(m),b:iso(e)}}
+function weekRes(k){const r=weekR(k),V=budView(r,1),had=S.txns.some(t=>!t.from&&t.type==='expense'&&t.date>=r.a&&t.date<=r.b);return {r,b:V.evB,s:V.evS,had,ok:had&&V.evB>0&&V.evS<=V.evB+.5}}
+function budStreak(){let n=0;for(let k=1;k<53;k++){const w=weekRes(k);if(!w.ok)break;n++}return n}
+function weekWrap(){
+  const dow=new Date().getDay(),k=dow===0?0:dow<=2?1:-1;if(k<0)return '';const w=weekRes(k);if(!w.had||!w.b||S.flags.wkSeen===w.r.a)return '';
+  const kept=w.b-w.s,st=budStreak()+(k===0&&w.ok?1:0),lab=k===0?'This week so far':'Last week';
+  return `<div class="card wrap ${kept>=0?'good':''}">${catChip({i:kept>=0?'trophy':'alert',c:kept>=0?'#c08a1f':'#c4463d'},40)}<div class="grow"><div class="eb">${lab}</div><div class="nm">${kept>=0?'You kept '+money(kept)+' of your everyday budget':'You went '+money(-kept)+' over your everyday budget'}</div>
+    <div class="sb">${money(w.s)} of ${money(w.b)} spent${st>1?' · '+st+' weeks under budget in a row':kept>=0?' · that is a win':' · fresh start this week'}</div></div><button class="btn ${kept>=0?'pri':'sec'} sm" data-act="wkSeen" data-a="${w.r.a}">${kept>=0?'Nice':'Got it'}</button></div>`;
 }
 function reportNudge(){
   const pv=shiftYM(curYM(),-1);
@@ -2310,6 +2337,7 @@ function rvCommit(){
   $('#reviewModal').classList.remove('open');RV=null;
   syncWatch();markActive();const spot=spotBills().length;
   const n=take.length;
+  completeMission('import');
   toast(n+' transaction'+(n>1?'s':'')+' imported',[xf?xf+' transfer'+(xf>1?'s':'')+' matched':'',rules?rules+' rule'+(rules>1?'s':'')+' saved':'',touched?touched+' older transaction'+(touched>1?'s':'')+' updated':'',renamed?renamed+' older transaction'+(renamed>1?'s':'')+' moved to the right account':'',spot?spot+' repeating bill'+(spot>1?'s':'')+' spotted, see Transactions':''].filter(Boolean).join(', ')||'Categories are set, tweak any of them in Transactions','good');
   commit();
   if(unknownList().length)setTimeout(()=>sorterOpen(),600);
@@ -2896,7 +2924,7 @@ function soApply(choice){
 }
 function soNext(dir){const el=$('#swCard');SO.i++;if(el&&!reduce){el.style.transition='transform .25s ease,opacity .25s';el.style.transform=`translateX(${dir==='l'?-140:140}%) rotate(${dir==='l'?-12:12}deg)`;el.style.opacity='0';setTimeout(drawSorter,230)}else drawSorter()}
 function soAccept(){const c=SO.cards[SO.i];if(!c)return;soApply(c.sug?c.sug.cat:'__keep')}
-function soClose(){if(!SO)return;const n=SO.sorted;if(n)markActive();$('#sortModal').classList.remove('open');if(n){gainXP(n*2);toast('Sorted '+n+' merchant'+(n===1?'':'s'),SO.txs+' transactions placed. Future imports follow your choices','good')}SO=null;commit()}
+function soClose(){if(!SO)return;const n=SO.sorted;if(n)markActive();$('#sortModal').classList.remove('open');if(n){gainXP(n*2);completeMission('sort');toast('Sorted '+n+' merchant'+(n===1?'':'s'),SO.txs+' transactions placed. Future imports follow your choices','good')}SO=null;commit()}
 (()=>{let sx=0,dx=0,drag=false;const box=()=>$('#sortBox');
   document.addEventListener('pointerdown',e=>{const c=e.target.closest&&e.target.closest('#swCard');if(!c||!SO)return;drag=true;sx=e.clientX;dx=0;c.setPointerCapture(e.pointerId);c.style.transition='none'});
   document.addEventListener('pointermove',e=>{if(!drag)return;const c=$('#swCard');if(!c)return;dx=e.clientX-sx;c.style.transform=`translateX(${dx}px) rotate(${dx/18}deg)`;c.classList.toggle('gl',dx<-40);c.classList.toggle('gr',dx>40)});
@@ -2962,7 +2990,7 @@ document.addEventListener('click',e=>{
   if(a==='recDel'){if(locked(S.recurring,el.dataset.id))return;const r=S.recurring.find(x=>x.id===el.dataset.id);if(r&&r.mkey)S.settings.billSkip=[...(S.settings.billSkip||[]),r.mkey].slice(-200);S.recurring=S.recurring.filter(x=>x.id!==el.dataset.id);save();render(true);if(r)toast('Stopped repeating '+(r.note||r.cat),'Past transactions are kept','info');return}
   if(a==='fDel'){$('#modal').classList.remove('open');if(MM.mode==='rule'){const r=S.recurring.find(x=>x.id===MM.id);S.recurring=S.recurring.filter(x=>x.id!==MM.id);save();render(true);if(r)toast('Stopped repeating '+(r.note||r.cat),'Past transactions are kept','info')}else{delTx(MM.id);save();render(true);toast('Transaction deleted','','info')}return}
   if(a==='achClose'){closeAch();return}
-  if(a==='mission'){const m=MISSIONS.find(x=>x.id===el.dataset.id);if(m.act==='add')openModal();else{S.view=m.view;if(m.id==='budget')completeMission('budget',el);save();render();scrollTo({top:0})}return}
+  if(a==='mission'){const m=MPOOL.find(x=>x.id===el.dataset.id);if(!m)return;if(m.act==='add')openModal();else if(m.act==='sort')sorterOpen();else{S.view=m.view;if(m.visit)completeMission(m.id,el);save();render();scrollTo({top:0})}return}
   if(a==='wizNext'){wizGo(W.i+1,true);return}
   if(a==='wizSkip'){wizGo(W.i+1,false);return}
   if(a==='wizBack'){wizGo(W.i-1,W.i<WIZ.length);return}
@@ -2974,7 +3002,7 @@ document.addEventListener('click',e=>{
   if(a==='itemEdit'){if(locked(S.items,el.dataset.id))return;itemOpen(el.dataset.id);return}
   if(a==='itemClose'){$('#itemModal').classList.remove('open');return}
   if(a==='itemDel'){if(locked(S.items,el.dataset.id))return;const it=S.items.find(x=>x.id===el.dataset.id);S.items=S.items.filter(x=>x.id!==el.dataset.id);commit();if(it)toast('Removed '+it.name,'','info');return}
-  if(a==='nav'){S.view=el.dataset.view;if(S.view==='budgets')completeMission('budget');save();render();scrollTo({top:0})}
+  if(a==='nav'){S.view=el.dataset.view;visitMission(S.view);save();render();scrollTo({top:0})}
   else if(a==='add')openModal();
   else if(a==='closeModal')$('#modal').classList.remove('open');
   else if(a==='report'){S.month=el.dataset.ym;S.view='report';S.flags.rpSeen=el.dataset.ym;save();render();scrollTo({top:0})}
@@ -2985,6 +3013,7 @@ document.addEventListener('click',e=>{
   else if(a==='readAll'){S.notifs.forEach(n=>n.read=true);save();renderTop()}
   else if(a==='delTx'){if(locked(S.txns,el.dataset.id))return;delTx(el.dataset.id);save();render(true);toast('Transaction deleted','','info')}
   else if(a==='gOpen'){GOPEN=el.dataset.id;render(true);setTimeout(()=>{const i=$('#c_'+GOPEN);if(i&&matchMedia('(hover:hover)').matches)i.focus()},30)}
+  else if(a==='wkSeen'){const good=el.classList.contains('pri');S.flags.wkSeen=el.dataset.a;if(good){const [x,y]=centerOf(el);confetti(x,y,{n:60,power:.8})}save();render(true)}
   else if(a==='glOpen'){glOpen(el.dataset.id)}
   else if(a==='glOff'){const g=GL&&S.goals.find(x=>x.id===GL.id);if(g){delete g.link;delete g.lsum;delete g.lcount}$('#authModal').classList.remove('open');save();render(true);if(g)toast(g.name+' unlinked','What it counted so far stays on the goal','info')}
   else if(a==='contrib'){const amt=el.dataset.amt?+el.dataset.amt:parseFloat(($('#c_'+el.dataset.id)||{}).value);contribute(el.dataset.id,amt,el)}
