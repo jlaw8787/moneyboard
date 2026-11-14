@@ -314,6 +314,9 @@ button.shline{font-weight:500}
 .note{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:10px;font-size:13px}
 .note.ok{background:var(--accent-soft);color:var(--accent-2)}
 .note.warn{background:var(--warn-soft);color:#8a5a12}
+.dbctl{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:20px}.dbctl .field{flex:none}.dbctl .field.grow{flex:1;min-width:180px}.dbctl #dbExtra{width:140px}
+@media (max-width:560px){.dbfigs{display:grid;grid-template-columns:1fr 1fr;gap:14px 12px}.dbfigs b{font-size:20px}.dbctl #dbExtra{width:120px}}
+.dbn{width:20px;height:20px;border-radius:50%;background:#f1f2f4;color:var(--muted);font-size:11px;font-weight:600;display:grid;place-items:center;flex:none}
 .tile{border:1px solid var(--line2);border-radius:12px;padding:16px;background:#fafbfc}
 .tile small{font-size:12.5px;color:var(--muted)}
 .tile b{display:block;font-size:22px;font-weight:600;letter-spacing:-.02em;color:var(--ink);margin-top:4px}
@@ -677,6 +680,8 @@ const ICONS = {
   bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
   chevL:'<path d="m15 18-6-6 6-6"/>', chevR:'<path d="m9 18 6-6-6-6"/>', chevD:'<path d="m6 9 6 6 6-6"/>', chevU:'<path d="m18 15-6-6-6 6"/>',
+  trendDown:'<path d="m3 7 6 6 4-4 8 8"/><path d="M15 17h6v-6"/>',
+  target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
   arrowR:'<path d="M5 12h14M13 6l6 6-6 6"/>',
   up:'<path d="M7 14l5-5 5 5"/>', down:'<path d="m7 10 5 5 5-5"/>',
   flame:'<path d="M12 3c1.2 3.2 5 5 5 10a5 5 0 0 1-10 0c0-2.2 1-3.6 2-4.6 0 2 1 3.1 2 3.1 0-3-1.2-5.2 1-8.5z"/>',
@@ -834,7 +839,7 @@ const GOAL_ICONS = ['shield','plane','home','car','gem','cap','sun','laptop','he
 const GOAL_COLS = ['#0e7a5c','#3f63a8','#cf8a3b','#8668ad','#4a9792','#b65b73'];
 const VIEWS = {
   dashboard:['grid','Dashboard'], transactions:['swap','Transactions'], budgets:['pie','Budgets'], report:['book','Report'],
-  goals:['flag','Goals'], challenges:['trophy','Challenges'], planner:['trend','Planner'], settings:['sliders','Settings']
+  goals:['flag','Goals'], debts:['trendDown','Debts'], challenges:['trophy','Challenges'], planner:['trend','Planner'], settings:['sliders','Settings']
 };
 const LEVEL_XP = 250;
 const TITLES = ['Rookie','Saver','Tracker','Planner','Strategist','Money Pro','Wealth Builder','Legend'];
@@ -862,7 +867,7 @@ const catInfo = t => t.type==='transfer'?XFER:(t.type==='income'?INCATS[t.cat]:C
 const catChip = (inf,s=32) => '<span class="cat" style="width:'+s+'px;height:'+s+'px;background:'+inf.c+'14;color:'+inf.c+'">'+ic(inf.i,s>30?16:14)+'</span>';
 
 /* ============ State ============ */
-function fresh(){return {txns:[],items:[],recurring:[],rules:[],period:'week',goals:[],accts:{},xp:0,unlocked:{},notifs:[],alerted:{},flags:{},settings:{currency:'AUD'},view:'dashboard',month:curYM()}}
+function fresh(){return {txns:[],items:[],recurring:[],rules:[],period:'week',goals:[],debts:[],accts:{},xp:0,unlocked:{},notifs:[],alerted:{},flags:{},settings:{currency:'AUD'},view:'dashboard',month:curYM()}}
 function load(){try{const s=localStorage.getItem(lkey());return s?JSON.parse(s):null}catch(e){return null}}
 const sig = () => JSON.stringify(S,(k,v)=>k==='view'||k==='month'||k==='savedAt'||k==='syncAt'||k==='syncUid'?undefined:v);
 let lastSig='';
@@ -926,6 +931,7 @@ function seed(){
   rr('expense',13,'Subscriptions','Spotify','monthly',onDay(12));
   rr('expense',35,'Utilities','Mobile plan','monthly',onDay(18));
   rr('expense',210,'Insurance','Private health insurance','monthly',onDay(3));
+  S.debts=[{id:uid(),name:'Visa',kind:'credit',acct:'Visa',rate:20.99,min:40,freq:'month',start:980},{id:uid(),name:'Car loan',kind:'car',bal:14800,at:iso(now),rate:8.9,min:195,freq:'fortnight',start:18500}];
   S.goals=[
     {id:uid(),name:'Emergency fund',target:10000,saved:4200,icon:'shield',color:'#0e7a5c',hit:{25:1}},
     {id:uid(),name:'Japan trip',target:6000,saved:1850,icon:'plane',color:'#3f63a8',hit:{25:1}},
@@ -1057,6 +1063,8 @@ const CHALLENGES = [
   {id:'fifty',icon:'book',name:'Bookkeeper',desc:'Log 50 transactions',xp:150,prog:()=>S.txns.length/50},
   {id:'setup',icon:'spark',name:'Blueprint',desc:'Finish the budget setup',xp:150,prog:()=>S.flags.setup?1:0},
   {id:'plan',icon:'compass',name:'Future you',desc:'Run a growth projection in the Planner',xp:50,prog:()=>S.flags.planned?1:0},
+  {id:'debtplan',icon:'target',name:'Game plan',desc:'Set up a debt payoff plan',xp:50,prog:()=>(S.debts||[]).length?1:0},
+  {id:'debtfree',icon:'rocket',name:'Cleared',desc:'Pay off a debt you are tracking',xp:250,prog:()=>(S.debts||[]).reduce((a,d)=>{const o=debtOwing(d),st=+d.start||0;return st>0&&o!=null?Math.max(a,clamp(1-o/st)):a},0)},
   {id:'backup',icon:'save',name:'Safe keeper',desc:'Export a backup of your data',xp:50,prog:()=>S.flags.backup?1:0}
 ];
 const XPC='linear-gradient(90deg,#f1c66b,#d39a2c)';
@@ -1724,6 +1732,124 @@ function renderCut(){
   $('#cutOut').innerHTML=`<div class="tile"><small>Average monthly ${esc(catName(P.cut))} spend</small><b>${money(avg)}</b></div><div class="tile"><small>Saved per year at ${P.pct}% less</small><b class="pos">${money(m*12)}</b></div><div class="tile"><small>Invested at 5% for 5 years</small><b>${money(v)}</b></div>`;
 }
 
+/* ============ Debt payoff planner ============ */
+/* Each debt is either linked to a credit card or loan account (balance follows it) or has a balance you keep up to date.
+   The plan pays every minimum, puts the extra on one target debt, and rolls a cleared debt's minimum onto the next. */
+const DKIND={credit:['Credit card','card','#b4553a'],loan:['Personal loan','percent','#8a5a9e'],car:['Car loan','car','#3f63a8'],bnpl:['Buy now pay later','bag','#cf8a3b'],study:['Study loan','cap','#2c7a8c'],other:['Other debt','layers','#69707d']};
+const DFREQ={week:['a week',52/12],fortnight:['a fortnight',26/12],month:['a month',1]};
+const dPlan=()=>{const p=S.settings.debtPlan=S.settings.debtPlan||{};if(p.strat!=='snowball')p.strat='avalanche';if(p.extra==null)p.extra=100;return p};
+function debtOwing(d){if(d.acct&&!BOARD&&acctNames().includes(d.acct)){const b=acctBal(d.acct);return b?Math.max(0,Math.round(-b.v*100)/100):null}return d.bal!=null?Math.max(0,+d.bal):null}
+const debtMin=d=>(+d.min||0)*(DFREQ[d.freq]||DFREQ.month)[1];
+function debtSim(list,extra,strat,noRoll){
+  const ds=list.map(d=>({id:d.id,bal:d.owe,rate:(+d.rate||0)/1200,min:debtMin(d),int:0})).filter(d=>d.bal>.005);
+  const ord=[...ds].sort(strat==='snowball'?(a,b)=>a.bal-b.bal||b.rate-a.rate:(a,b)=>b.rate-a.rate||a.bal-b.bal);
+  const budget=ds.reduce((a,d)=>a+d.min,0)+Math.max(0,+extra||0),paid={},series=[ds.reduce((a,d)=>a+d.bal,0)];let m=0,int=0;
+  while(ds.some(d=>d.bal>.005)&&m<600){m++;
+    ds.forEach(d=>{if(d.bal>.005){const i=d.bal*d.rate;d.bal+=i;d.int+=i;int+=i}});
+    let pool=noRoll?0:budget;
+    ds.forEach(d=>{if(d.bal>.005){const p=Math.min(d.min,d.bal);d.bal-=p;if(!noRoll)pool-=p}});
+    if(!noRoll)for(const d of ord){if(pool<=.005)break;if(d.bal>.005){const p=Math.min(pool,d.bal);d.bal-=p;pool-=p}}
+    ds.forEach(d=>{if(d.bal<=.005&&!paid[d.id])paid[d.id]=m});
+    series.push(ds.reduce((a,d)=>a+Math.max(0,d.bal),0));
+    if(m===24&&series[24]>=series[0]-.01)break;
+  }
+  const done=!ds.some(d=>d.bal>.005);return {m,int,paid,series,done,ord:ord.map(d=>d.id),budget};
+}
+function mSpan(m){const y=Math.floor(m/12),r=m%12;return [y?y+' year'+(y>1?'s':''):'',r?r+' month'+(r>1?'s':''):''].filter(Boolean).join(' ')||'Under a month'}
+const mDate=m=>ymLabel(shiftYM(curYM(),m));
+const mTick=m=>{const [y,mo]=shiftYM(curYM(),m).split('-').map(Number);return new Date(y,mo-1,1).toLocaleDateString('en-AU',{month:'short'})+" '"+String(y).slice(2)};
+function debtRows(){return (S.debts||[]).map(d=>Object.assign({},d,{owe:debtOwing(d)}))}
+function debtSuggest(){if(BOARD)return [];const used=new Set((S.debts||[]).map(d=>d.acct).filter(Boolean));return acctNames().filter(n=>isDebt(acctKind(n))&&!used.has(n))}
+
+V.debts=()=>{
+  const rows=debtRows(),sug=debtSuggest(),p=dPlan();
+  const sugHtml=sug.map(n=>{const b=acctBal(n),K=AKIND[acctKind(n)]||AKIND.credit;return `<div class="lrow clk" data-act="debtNew" data-n="${esc(n)}">${catChip({i:K[1],c:K[2]},32)}<div class="grow"><div class="nm" style="font-size:13.5px">${esc(n)}</div><div class="sb">${b?money(Math.max(0,-b.v),2)+' owing':'No balance yet'} · from your accounts</div></div><span class="lnk">${ic('plus',14,2)}Add</span></div>`}).join('');
+  if(!rows.length)return `<div class="card" style="max-width:640px"><div class="ch"><h3>Plan your way out of debt</h3></div>
+    <p class="muted" style="font-size:13.5px;margin-bottom:16px">Add your credit cards and loans with their interest rate and minimum repayment. You get a debt free date, what it will cost in interest, and how much sooner you get there by putting a bit extra on each month.</p>
+    ${sug.length?`<div class="sb" style="margin-bottom:6px">From your accounts</div>${sugHtml}<div style="height:16px"></div>`:''}
+    <button class="btn pri" data-act="debtNew" data-n="">${ic('plus',16,2)}Add a debt</button></div>`;
+  const owe=rows.reduce((a,d)=>a+(d.owe||0),0),start=rows.reduce((a,d)=>a+Math.max(+d.start||0,d.owe||0),0),gone=Math.max(0,start-owe);
+  return `<div class="grid w21">
+    <div class="card chart"><div class="ch"><h3>Your payoff plan</h3><span class="s">${p.strat==='snowball'?'Smallest balance first':'Highest interest first'}</span></div>
+      <div class="dbctl">
+        <div class="field">Strategy<div class="segc" id="dbStrat"><button data-dbs="avalanche" class="${p.strat==='avalanche'?'on':''}">Avalanche</button><button data-dbs="snowball" class="${p.strat==='snowball'?'on':''}">Snowball</button></div></div>
+        <label class="field">Extra each month<input class="inp" id="dbExtra" type="number" min="0" step="10" inputmode="decimal" value="${+p.extra||0}"></label>
+        <label class="field grow"><span style="display:flex;justify-content:space-between">Slide to try it<b id="dbExLab" style="color:var(--ink);font-weight:600">${money(+p.extra||0)}</b></span><input class="range" type="range" id="dbRange" min="0" max="${Math.max(2000,Math.ceil((+p.extra||0)/500)*500)}" step="10" value="${+p.extra||0}" style="height:38px"></label>
+      </div>
+      <div id="dbOut"></div>
+    </div>
+    <div class="card"><div class="ch"><h3>Payoff order</h3><button class="lnk" data-act="debtNew" data-n="">${ic('plus',14,2)}Add debt</button></div>
+      <div class="acctot" style="margin-bottom:6px"><div><div class="sb">Total owing</div><div class="num neg" style="font-size:24px">${money(owe,2)}</div></div>${gone>.5?`<div style="text-align:right"><div class="sb">Paid off so far</div><div class="amt pos" style="font-size:15px">${money(gone,2)}</div></div>`:''}</div>
+      ${gone>.5?`<div style="margin:2px 0 14px">${bar(gone/start,'var(--accent)',6)}<div class="subtle" style="font-size:11.5px;margin-top:6px">${Math.round(gone/start*100)}% of ${money(start)} since you started tracking</div></div>`:''}
+      <div id="dbList"></div>
+      ${sug.length?`<div class="sb" style="margin:16px 0 4px">Also in your accounts</div>${sugHtml}`:''}
+    </div>
+  </div>
+  <p class="subtle" style="font-size:12px;margin-top:-4px">Avalanche clears the highest interest rate first and costs the least. Snowball clears the smallest balance first for quicker wins. Either way, every minimum gets paid and a cleared debt's repayment rolls onto the next one. Figures are estimates that assume rates and repayments stay the same.</p>`;
+};
+function renderDebtOut(){
+  const box=$('#dbOut');if(!box)return;const p=dPlan(),rows=debtRows(),ok=rows.filter(d=>d.owe>.005),miss=rows.filter(d=>d.owe==null);
+  const plan=debtSim(ok,p.extra,p.strat),base=debtSim(ok,0,p.strat,true),alt=debtSim(ok,p.extra,p.strat==='snowball'?'avalanche':'snowball');
+  /* List, in payoff order */
+  const pos=new Map(plan.ord.map((id,i)=>[id,i])),sorted=[...rows].sort((a,b)=>{const pa=plan.paid[a.id]||9999,pb=plan.paid[b.id]||9999;return (a.owe>.005?0:1)-(b.owe>.005?0:1)||pa-pb||(pos.get(a.id)??99)-(pos.get(b.id)??99)});
+  let n=0;$('#dbList').innerHTML=sorted.map(d=>{const K=DKIND[d.kind]||DKIND.other,cleared=d.owe!=null&&d.owe<=.005,low=d.owe>.005&&debtMin(d)<=d.owe*(+d.rate||0)/1200+.005;
+    const pill=d.owe==null?'<span class="pill warn">Add balance</span>':cleared?'<span class="pill ok">Cleared</span>':plan.paid[d.id]?`<span class="pill nt">${esc(mTick(plan.paid[d.id]))}</span>`:'';
+    const sub=[(+d.rate||0)+'%',d.min?money(+d.min)+' '+(DFREQ[d.freq]||DFREQ.month)[0]:'no minimum set',d.acct&&!BOARD?'follows '+d.acct:''].filter(Boolean).join(' · ');
+    return `<div class="lrow clk" data-act="debtEdit" data-id="${d.id}">${d.owe>.005?`<span class="dbn">${++n}</span>`:''}${catChip({i:K[1],c:K[2]},32)}<div class="grow"><div class="nm" style="font-size:13.5px">${esc(d.name)}</div><div class="sb">${esc(sub)}</div>${low?'<div class="sb neg">Minimum does not cover the interest</div>':''}</div><div style="text-align:right"><div class="amt">${d.owe==null?'':money(d.owe,2)}</div>${pill}</div></div>`}).join('');
+  if(!ok.length){box.innerHTML=`<div class="note ok" style="margin-top:4px">${ic('check',16,2)}<span>${miss.length?'Add a balance to each debt to see your plan.':'Nothing owing. Every debt you track is cleared.'}</span></div>`;return}
+  if(!plan.done){box.innerHTML=`<div class="note warn" style="margin-top:4px">${ic('alert',16,2)}<span>At these repayments the total owing does not go down, because the interest is more than you pay. Raise the extra amount or check each minimum.</span></div>`;return}
+  const intSave=base.done?base.int-plan.int:0,mSave=base.done?base.m-plan.m:0,altDiff=alt.done?alt.int-plan.int:0;
+  /* Chart: total owing over time, plan against minimums only */
+  const W=640,H=200,L=50,xMax=Math.max(1,Math.min(360,Math.max(plan.m,base.done?base.m:plan.m*2))),mx=Math.max(1,plan.series[0])*1.08,X=i=>L+i/xMax*(W-L),Y=v=>H-v/mx*H;
+  const path=s=>s.slice(0,xMax+1).map((v,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1)).join('');
+  const gl=[0,.5,1].map(f=>{const v=mx/1.08*f;return `<line x1="${L}" x2="${W}" y1="${Y(v)}" y2="${Y(v)}" stroke="#eff1f4"/><text x="${L-8}" y="${Y(v)+4}" text-anchor="end">${short(v)}</text>`}).join('');
+  const step=xMax<=12?3:xMax<=30?6:xMax<=72?12:Math.ceil(xMax/60)*12;let xl='';for(let m=0;m<=xMax;m+=step)xl+=`<text x="${X(m)}" y="${H+20}" text-anchor="${m?'middle':'start'}">${m?mTick(m):'Now'}</text>`;
+  const dots=ok.filter(d=>plan.paid[d.id]&&plan.paid[d.id]<=xMax).map(d=>{const m=plan.paid[d.id];return `<circle cx="${X(m)}" cy="${Y(plan.series[m])}" r="4" fill="#fff" stroke="#0e7a5c" stroke-width="2"><title>${esc(d.name)} cleared ${esc(mDate(m))}</title></circle>`}).join('');
+  box.innerHTML=`<div class="figs dbfigs"><div><small>Debt free by</small><b class="pos">${esc(mDate(plan.m))}</b></div><div><small>Time to go</small><b>${esc(mSpan(plan.m))}</b></div><div><small>Interest to pay</small><b>${money(plan.int)}</b></div></div>
+  <svg viewBox="0 -8 ${W} ${H+30}">${gl}<path class="fadein" d="${path(plan.series)}L${X(plan.m)} ${H}L${L} ${H}Z" fill="#0e7a5c" fill-opacity=".1"/>${base.series.length>1?`<path d="${path(base.series)}" fill="none" stroke="#b4553a" stroke-width="1.5" stroke-dasharray="4 4"/>`:''}<path class="ln" d="${path(plan.series)}" fill="none" stroke="#0e7a5c" stroke-width="2"/>${dots}${xl}</svg>
+  <div class="legend" style="margin-top:10px"><span><i style="background:#0e7a5c"></i>Your plan, ${money(plan.budget)} a month</span><span><i style="background:#b4553a"></i>Minimums only</span></div>
+  <div class="grid c3 dbtiles" style="margin:16px 0 0">
+    ${base.done?`<div class="tile"><small>Interest saved vs minimums</small><b class="${intSave>.5?'pos':''}">${money(Math.max(0,intSave))}</b></div><div class="tile"><small>Debt free sooner by</small><b>${mSave>0?esc(mSpan(mSave)):'Same time'}</b></div>`:`<div class="tile"><small>On minimums only</small><b class="neg">Never cleared</b></div>`}
+    <div class="tile"><small>Going ${p.strat==='snowball'?'avalanche':'snowball'} instead</small><b>${Math.abs(altDiff)<1?'Same interest':money(Math.abs(altDiff))+(altDiff>=0?' more':' less')}</b></div>
+  </div>
+  ${!base.done?`<div class="note warn" style="margin-top:14px">${ic('info',16,2)}<span>On minimums alone some of this never gets paid off. The extra each month is what clears it.</span></div>`:''}
+  ${miss.length?`<div class="note warn" style="margin-top:14px">${ic('info',16,2)}<span>${miss.length===1?esc(miss[0].name)+' has':miss.length+' debts have'} no balance yet, so ${miss.length===1?'it is':'they are'} left out.</span></div>`:''}`;
+  animate(true);
+}
+let DE=null;
+function debtEdit(id,acct){
+  const d=id?(S.debts||[]).find(x=>x.id===id):null;if(id&&!d)return;
+  const linkable=BOARD?[]:acctNames().filter(n=>isDebt(acctKind(n))||(d&&d.acct===n)),used=new Set((S.debts||[]).filter(x=>x!==d).map(x=>x.acct).filter(Boolean));
+  const a=d?(d.acct||''):(acct||''),kind=d?d.kind:acct&&acctKind(acct)==='loan'?'loan':'credit',owe=d?debtOwing(d):null;DE={id:d?d.id:null};
+  $('#authBox').innerHTML=`<div class="mh"><h2>${d?esc(d.name):'Add a debt'}</h2><button class="del" style="opacity:1" data-act="authClose" aria-label="Close">${ic('x',16)}</button></div>
+  <form id="debtForm" style="display:flex;flex-direction:column;gap:12px">
+    <label class="field">Name<input class="inp" id="dbName" maxlength="40" value="${esc(d?d.name:acct||'')}" placeholder="Visa, car loan, Afterpay" required></label>
+    <label class="field">Type<select class="inp" id="dbKind">${Object.entries(DKIND).map(([v,K])=>`<option value="${v}" ${v===kind?'selected':''}>${K[0]}</option>`).join('')}</select></label>
+    ${linkable.length?`<label class="field">Balance comes from<select class="inp" id="dbAcct"><option value="">I will enter it myself</option>${linkable.map(n=>`<option value="${esc(n)}" ${n===a?'selected':''} ${used.has(n)?'disabled':''}>${esc(n)} account${used.has(n)?' (already added)':''}</option>`).join('')}</select></label>`:''}
+    <div id="dbBalRow" ${a?'hidden':''}><label class="field">Amount owing<input class="inp" id="dbBal" type="number" step="0.01" min="0" inputmode="decimal" value="${d&&!d.acct&&d.bal!=null?(+d.bal).toFixed(2):''}" placeholder="0.00"></label></div>
+    <div class="muted" id="dbHint" style="font-size:12.5px">${a?'The balance follows this account, so payments you log or import bring it down on their own.':'Update this whenever you check your statement.'}${owe!=null&&a?' Owing now: '+money(owe,2)+'.':''}</div>
+    <div class="row2"><label class="field">Interest rate (% a year)<input class="inp" id="dbRate" type="number" step="0.01" min="0" inputmode="decimal" value="${d?d.rate:''}" placeholder="19.99" required></label>
+    <label class="field">Minimum repayment<input class="inp" id="dbMin" type="number" step="0.01" min="0" inputmode="decimal" value="${d&&d.min?d.min:''}" placeholder="0.00"></label></div>
+    <label class="field">Repayment is due<select class="inp" id="dbFreq">${Object.entries(DFREQ).map(([v,F])=>`<option value="${v}" ${v===(d&&d.freq||'month')?'selected':''}>Every ${F[0].replace('a ','')}</option>`).join('')}</select></label>
+    <div class="autherr" id="dbErr"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" type="submit">${ic('check',16,2)}${d?'Save':'Add debt'}</button>${d?'<button class="btn sec" type="button" data-act="debtDel">Remove</button>':''}</div>
+  </form>`;
+  $('#authModal').classList.add('open');setTimeout(()=>$(d?'#dbRate':'#dbName').focus(),50);
+}
+function debtSave(){
+  const name=$('#dbName').value.trim().replace(/\s+/g,' '),kind=$('#dbKind').value,acct=($('#dbAcct')||{}).value||'',rawB=$('#dbBal').value.trim(),rate=parseFloat($('#dbRate').value),min=parseFloat($('#dbMin').value)||0,freq=$('#dbFreq').value,err=$('#dbErr');
+  if(!name){err.textContent='Give the debt a name';return}
+  if(!(rate>=0)||rate>100){err.textContent='Enter the interest rate as a percentage, like 19.99';return}
+  if(!acct&&rawB&&!(parseFloat(rawB)>=0)){err.textContent='Enter the amount owing as a number';return}
+  S.debts=S.debts||[];let d=DE&&DE.id&&S.debts.find(x=>x.id===DE.id);const isNew=!d;
+  if(!d){d={id:uid(),ts:Date.now()};S.debts.push(d)}
+  Object.assign(d,{name,kind,rate:Math.round(rate*100)/100,min:Math.round(min*100)/100,freq});
+  if(acct){d.acct=acct;delete d.bal}else{delete d.acct;if(rawB){d.bal=Math.round(parseFloat(rawB)*100)/100;d.at=iso(new Date())}else delete d.bal}
+  const owe=debtOwing(d);if(owe!=null&&owe>(+d.start||0))d.start=owe;
+  $('#authModal').classList.remove('open');DE=null;
+  toast(isNew?'Debt added':'Debt saved',name+(owe!=null?' · '+money(owe,2)+' owing':''),'good');if(isNew)gainXP(10);commit();
+}
+
 V.settings=()=>`
   <div class="grid c2">
     <div class="card" id="acctCard">${acctCard()}</div>
@@ -1900,12 +2026,12 @@ V.report=()=>{
 function repTrends(){const P=dashParts();return `<div class="ch" style="margin:8px 0 12px"><h3>Trends</h3></div><div class="grid w21">${P.pace}${P.health}</div>${P.insights}<div class="grid cashg">${P.cash}</div>`}
 
 /* ============ Render ============ */
-const SUBS={dashboard:()=>ymLabel(S.month)+' overview',transactions:()=>'Every dollar in and out',budgets:()=>'Your budget, tracked week by week',report:()=>'Where your money went in '+ymLabel(S.month,'m'),goals:()=>'Savings goals and progress',challenges:()=>'Badges, XP and levels',planner:()=>'Projections and what-ifs',settings:()=>'Backup, restore and preferences'};
+const SUBS={dashboard:()=>ymLabel(S.month)+' overview',transactions:()=>'Every dollar in and out',budgets:()=>'Your budget, tracked week by week',report:()=>'Where your money went in '+ymLabel(S.month,'m'),goals:()=>'Savings goals and progress',debts:()=>'Your plan to be debt free',challenges:()=>'Badges, XP and levels',planner:()=>'Projections and what-ifs',settings:()=>'Backup, restore and preferences'};
 function navBtn(id){const [i,l]=VIEWS[id];return `<button data-act="nav" data-view="${id}" class="${S.view===id?'active':''}">${ic(i,18)}<span>${l}</span></button>`}
 function renderNav(){
-  $('#nav').innerHTML='<div class="navlab">Overview</div>'+['dashboard','transactions','budgets','report'].map(navBtn).join('')+'<div class="navlab">Planning</div>'+['goals','challenges','planner'].map(navBtn).join('');
+  $('#nav').innerHTML='<div class="navlab">Overview</div>'+['dashboard','transactions','budgets','report'].map(navBtn).join('')+'<div class="navlab">Planning</div>'+['goals','debts','challenges','planner'].map(navBtn).join('');
   $('#navSettings').innerHTML=navBtn('settings');
-  const extra=['report','challenges','planner','settings'];
+  const extra=['report','debts','challenges','planner','settings'];
   $('#bnav').innerHTML=['dashboard','transactions','budgets','goals'].map(id=>`<button data-act="nav" data-view="${id}" class="${S.view===id?'active':''}">${ic(VIEWS[id][0],20)}${VIEWS[id][1]}</button>`).join('')+`<button data-act="more" class="${extra.includes(S.view)?'active':''}" aria-label="More pages">${ic('more',20)}More</button>`;
   $('#msheet').innerHTML=extra.map(navBtn).join('');
 }
@@ -1929,6 +2055,7 @@ function render(quiet){
   renderNav();renderTop();renderBoardSw();$('#view').innerHTML=V[S.view]();
   if(S.view==='transactions')renderTxList();
   if(S.view==='planner'){renderProjection();renderCut()}
+  if(S.view==='debts')renderDebtOut();
   animate(quiet);document.title=VIEWS[S.view][1]+' · Moneyboard';
 }
 function animate(quiet){
@@ -2080,7 +2207,7 @@ function renameAcct(o,n){if(!o||o===n)return;
   const st=S.settings;['acctBank','jointAccts'].forEach(k=>{if(st[k]&&o in st[k]){st[k][n]=st[k][o];delete st[k][o]}});
   if(st.acctMap)for(const k in st.acctMap)if(st.acctMap[k]===o)st.acctMap[k]=n;
   (st.shareRules||[]).forEach(r=>{if(r.f==='acct'&&r.v===o)r.v=n});
-  S.goals.forEach(g=>{if(g.link&&g.link.acct===o)g.link.acct=n});
+  S.goals.forEach(g=>{if(g.link&&g.link.acct===o)g.link.acct=n});(S.debts||[]).forEach(d=>{if(d.acct===o)d.acct=n});
   if(st.lastAcct===o)st.lastAcct=n;
 }
 function acctSave(){
@@ -3150,6 +3277,7 @@ document.addEventListener('click',e=>{
   const fs=e.target.closest('[data-fs]');if(fs){F.all=fs.dataset.fs==='a';F.lim=150;document.querySelectorAll('#fscope [data-fs]').forEach(b=>b.classList.toggle('on',b.dataset.fs===fs.dataset.fs));renderTxList();return}
   const ft=e.target.closest('[data-ft]');if(ft){F.type=ft.dataset.ft;document.querySelectorAll('[data-ft]').forEach(b=>b.classList.toggle('on',b===ft));renderTxList();return}
   const fq=e.target.closest('#wFreq [data-f],#iFreq [data-f]');if(fq){const box=fq.parentElement;box.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===fq));if(box.id==='wFreq'){W.f=fq.dataset.f;$('#wConv').innerHTML=convText(parseAmt($('#wAmt').value),W.f);$('#wAmt').focus()}else{IM.f=fq.dataset.f;$('#iConv').innerHTML=convText(parseAmt($('#iAmt').value),IM.f)}return}
+  const dbs=e.target.closest('[data-dbs]');if(dbs){dPlan().strat=dbs.dataset.dbs;document.querySelectorAll('[data-dbs]').forEach(b=>b.classList.toggle('on',b===dbs));const sb=dbs.closest('.card').querySelector('.ch .s');if(sb)sb.textContent=dbs.dataset.dbs==='snowball'?'Smallest balance first':'Highest interest first';save();renderDebtOut();return}
   const pr=e.target.closest('[data-per]');if(pr){S.period=pr.dataset.per;save();render(true);return}
   if(e.target.id==='wiz'){wizClose();return}
   if(e.target.id==='ach'){closeAch();return}
@@ -3238,8 +3366,11 @@ document.addEventListener('click',e=>{
   else if(a==='glOpen'){glOpen(el.dataset.id)}
   else if(a==='txMore'){F.lim+=150;renderTxList()}
   else if(a==='acctEdit'){acctEdit(el.dataset.n)}
+  else if(a==='debtNew'){debtEdit(null,el.dataset.n)}
+  else if(a==='debtEdit'){debtEdit(el.dataset.id)}
+  else if(a==='debtDel'){const d=DE&&(S.debts||[]).find(x=>x.id===DE.id);if(d){S.debts=S.debts.filter(x=>x!==d);DE=null;$('#authModal').classList.remove('open');commit();toast(d.name+' removed','','info')}}
   else if(a==='acctShow'){ASHOW=!ASHOW;render(true)}
-  else if(a==='acctDel'){const n=AE&&AE.n;if(n){delete S.accts[n];AE=null;$('#authModal').classList.remove('open');commit();toast(n+' removed','','info')}}
+  else if(a==='acctDel'){const n=AE&&AE.n;if(n){delete S.accts[n];(S.debts||[]).forEach(d=>{if(d.acct===n){d.bal=Math.max(0,+d.start||0);delete d.acct}});AE=null;$('#authModal').classList.remove('open');commit();toast(n+' removed','','info')}}
   else if(a==='glOff'){const g=GL&&S.goals.find(x=>x.id===GL.id);if(g){delete g.link;delete g.lsum;delete g.lcount}$('#authModal').classList.remove('open');save();render(true);if(g)toast(g.name+' unlinked','What it counted so far stays on the goal','info')}
   else if(a==='contrib'){const amt=el.dataset.amt?+el.dataset.amt:parseFloat(($('#c_'+el.dataset.id)||{}).value);contribute(el.dataset.id,amt,el)}
   else if(a==='delGoal'){if(locked(S.goals,el.dataset.id))return;if(el.dataset.armed){S.goals=S.goals.filter(g=>g.id!==el.dataset.id);save();render()}else{el.dataset.armed=1;el.style.width='auto';el.style.padding='0 8px';el.style.color='var(--neg)';el.textContent='Delete?';setTimeout(()=>{if(el.isConnected){delete el.dataset.armed;el.removeAttribute('style');el.innerHTML=ic('x',14)}},3000)}}
@@ -3259,6 +3390,7 @@ document.addEventListener('input',e=>{const t=e.target;
   else if(t.id==='iAmt'){$('#iConv').innerHTML=convText(parseAmt(t.value),IM.f)}
   else if(t.dataset.p){P[t.dataset.p]=parseFloat(t.value)||0;renderProjection();if(!S.flags.planned){S.flags.planned=true;evalChallenges();save();renderTop()}}
   else if(t.id==='ppct'){P.pct=+t.value;renderCut()}
+  else if(t.id==='dbExtra'||t.id==='dbRange'){const v=Math.max(0,Math.round(parseFloat(t.value)||0));dPlan().extra=v;if(t.id==='dbRange')$('#dbExtra').value=v;else{const r=$('#dbRange');if(v>+r.max)r.max=Math.ceil(v/500)*500;r.value=v}$('#dbExLab').textContent=money(v);renderDebtOut()}
 });
 ['dragenter','dragover'].forEach(ev=>document.addEventListener(ev,e=>{const z=e.target.closest&&e.target.closest('[data-drop="bank"]');if(!z||!e.dataTransfer||![...e.dataTransfer.types].includes('Files'))return;e.preventDefault();z.classList.add('over')}));
 document.addEventListener('dragleave',e=>{const z=e.target.closest&&e.target.closest('[data-drop="bank"]');if(z&&!z.contains(e.relatedTarget))z.classList.remove('over')});
@@ -3272,7 +3404,7 @@ document.addEventListener('change',e=>{const t=e.target;
     const n=S.txns.filter(x=>x.acct===a&&shOf('txns',x)).length;feedChanged(t.value?a+' now feeds '+bName(t.value):a+' is personal only',t.value?n+' transaction'+(n===1?'':'s')+' will show on the joint board, plus new imports':'Its transactions come off the joint board')}
   else if(t.dataset.jas!=null){const sp=S.settings.acctSplit=S.settings.acctSplit||{};if(+t.value>=100)delete sp[t.dataset.jas];else sp[t.dataset.jas]=+t.value;feedChanged('Split saved',t.dataset.jas+': '+splitWord(+t.value))}
   else if(t.dataset.ren!=null){const o=t.dataset.ren,nm=t.value.trim().slice(0,40);if(!nm||nm===o){t.value=o;return}let n=0;S.txns.forEach(x=>{if(x.acct===o){x.acct=nm;n++}});
-    ['jointAccts','acctSplit','acctBank'].forEach(k=>{const m=S.settings[k];if(m&&m[o]!=null){m[nm]=m[o];delete m[o]}});(S.settings.shareRules||[]).forEach(r=>{if(r.f==='acct'&&r.v===o)r.v=nm});
+    (S.debts||[]).forEach(d=>{if(d.acct===o)d.acct=nm});['jointAccts','acctSplit','acctBank'].forEach(k=>{const m=S.settings[k];if(m&&m[o]!=null){m[nm]=m[o];delete m[o]}});(S.settings.shareRules||[]).forEach(r=>{if(r.f==='acct'&&r.v===o)r.v=nm});
     const am=S.settings.acctMap||{};Object.keys(am).forEach(k=>{if(am[k]===o)am[k]=nm});feedChanged('Account renamed',n+' transaction'+(n===1?'':'s')+' moved to '+nm)}
   else if(t.id==='rfF'){RF.f=t.value;refreshShareCard()}
   else if(t.dataset.shsel){const w=t.closest('.shfield'),b=w&&w.querySelector('.shsplit');if(b)b.hidden=!t.value}
@@ -3281,6 +3413,8 @@ document.addEventListener('change',e=>{const t=e.target;
   else if(t.name==='glk'||t.id==='glSince'){glPreview()}
   else if(t.id==='sNotif'){S.settings.notifLevel=t.value;if(t.value!=='all'){S.notifs=S.notifs.filter(n=>!NOTIF_EXTRA[n.cat])}save();$('#remindCard').innerHTML=remindCard();renderTop()}
   else if(t.id==='sRemind'){S.settings.remind=+t.value;checkBills(true);save();toast(+t.value?'Bill reminders on':'Bill reminders off',+t.value?'You will be reminded '+t.selectedOptions[0].text.toLowerCase():'Turn them back on any time here','info')}
+  else if(t.id==='dbExtra'||t.id==='dbRange'){save()}
+  else if(t.id==='dbAcct'){$('#dbBalRow').hidden=!!t.value;$('#dbHint').textContent=t.value?'The balance follows this account, so payments you log or import bring it down on their own.':'Update this whenever you check your statement.';const nm=$('#dbName');if(t.value&&!nm.value.trim())nm.value=t.value;if(t.value&&acctKind(t.value)==='loan')$('#dbKind').value='loan'}
   else if(t.id==='aeKind'){$('#aeBalLab').textContent=isDebt(t.value)?'Amount owing':'Balance'}
   else if(t.id==='bankFile'&&t.files.length){const fs=[...t.files];t.value='';importBankFiles(fs)}
   else if(t.id==='importFile'&&t.files[0]){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.txns))throw 0;S=Object.assign(fresh(),d,{syncUid:S.syncUid,syncAt:S.syncAt,view:S.view});S.flags.welcomed=true;S.flags.sample=false;save();render();toast('Backup restored',S.txns.length+' transactions loaded','good')}catch(err){toast('Import failed','Choose a Moneyboard backup file (.json)','bad')}};r.readAsText(t.files[0])}
@@ -3297,6 +3431,7 @@ document.addEventListener('submit',e=>{
     const ex=IM.id&&S.items.find(x=>x.id===IM.id),shE=$('#iShare');let tgt=ex;if(ex){if(ex.name!==name||ex.cat!==cat)ex.key=null;Object.assign(ex,{name,cat,amt,freq:IM.f});delete ex.full}else{tgt={id:uid(),key:null,cat,name,amt,freq:IM.f};S.items.push(tgt)}if(shE)readShare('iShare','items',tgt);
     $('#itemModal').classList.remove('open');if(cat!=='Income')OPEN.add(cat);commit();toast('Budget item saved',name+': '+money(amt*FREQ[IM.f][1],2)+' a week','good');return}
   if(e.target.id==='acctForm'){e.preventDefault();acctSave();return}
+  if(e.target.id==='debtForm'){e.preventDefault();debtSave();return}
   if(e.target.id==='glForm'){e.preventDefault();const g=GL&&S.goals.find(x=>x.id===GL.id),L=glPick();if(!g)return;if(!L){$('#glErr').textContent='Pick an account or a transfer, or type what the transfers mention';return}
     const before=g.saved;const sv=$('#glSince').value;g.link=Object.assign(L,sv==='all'?{}:{since:sv==='keep'&&g.link&&g.link.since?g.link.since:iso(new Date())});$('#authModal').classList.remove('open');syncGoalLinks();const d=Math.round((g.saved-before)*100)/100;
     toast(g.name+' linked','Follows '+linkLabel(g.link)+(d?'. '+(d>0?'+':'-')+money(Math.abs(d))+' counted':''),'good');save();render(true);return}
